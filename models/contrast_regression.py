@@ -1,10 +1,11 @@
 # Performs linear regression on a contrast function created from the
 # Haxby dataset
+from sklearn.cross_validation import LeavePLabelOut
+from nilearn.input_data import NiftiMasker
 from sklearn import linear_model
 from nilearn import datasets
-from nilearn.input_data import NiftiMasker
-import matplotlib.pyplot as plt
-import seaborn as sns
+# import matplotlib.pyplot as plt
+# import seaborn as sns
 import numpy as np
 
 # PREPROCESSING
@@ -12,12 +13,20 @@ import numpy as np
 # Import all subjects from the haxby dataset
 haxby_dataset = datasets.fetch_haxby(n_subjects=6)
 
-contrasts = {}
-fmris = {}
+# Create sessions id
+sessions_id = [x/121 for x in range(1452)]
+
+# Initialize Leave P Label Out cross validation
+lplo = LeavePLabelOut(sessions_id, p=2)
+
+contrast_train = {}
+contrast_test = {}
+fmri_train = {}
+fmri_test = {}
 # Loop through all subjects
 for i in range(6):
     # Read labels
-    labels = np.recfromcsv(haxby_dataset.session_target[1], delimiter=" ")
+    labels = np.recfromcsv(haxby_dataset.session_target[i], delimiter=" ")
     target = labels['labels']
 
     # Create faces and houses time series
@@ -25,38 +34,32 @@ for i in range(6):
     houses = [1 if x == 'house' else 0 for x in target]
 
     # Create contrast time series
-    contrasts[str(i)] = np.subtract(faces, houses)
+    contrast = np.subtract(faces, houses)
 
     # Read activity data
     # Standardize and detrend
     mask_filename = haxby_dataset.mask_vt[i]
     nifti_masker = NiftiMasker(mask_img=mask_filename, standardize=True,
-                               detrend=True, smoothing_fwhm='fast')
+                               detrend=True, sessions=sessions_id)
     func_filename = haxby_dataset.func[i]
-    fmris[str(i)] = nifti_masker.fit_transform(func_filename)
+    fmri = nifti_masker.fit_transform(func_filename)
 
-contrasts_train = np.hstack((contrasts['0'], contrasts['1'], contrasts['2'],
-                             contrasts['3'], contrasts['4']))
-fmris_train = np.hstack((fmris['0'], fmris['1'], fmris['2'], fmris['3'],
-                         fmris['4']))
-contrasts_test = contrasts['5']
-fmris_test = fmris['5']
+    # Divide in train and test sets
+    for train_index, test_index in lplo:
+        contrast_train[str(i)] = contrast[train_index]
+        contrast_test[str(i)] = contrast[test_index]
+        fmri_train[str(i)] = fmri[train_index]
+        fmri_test[str(i)] = fmri[test_index]
 
 # MODEL
 
-# Fit linear model
-clf = linear_model.LinearRegression()
-clf.fit(fmris_train, contrasts_train)
+for i in range(6):
+    # Fit linear model
+    clf = linear_model.LinearRegression()
+    clf.fit(fmri_train[str(i)], contrast_train[str(i)])
 
-# TEST
-prediction = clf.predict(fmris_test)
+    # TEST
+    prediction = clf.predict(fmri_test[str(i)])
 
-# Show time-series
-plt.plot(np.arange(0, 1452), contrasts_test)
-plt.plot(np.arange(0, 1452), prediction)
-plt.ylim([-2, 2])
-plt.title = ('Test fit')
-plt.show()
-
-# Print train score
-clf.score(fmris_test, contrasts_test)
+    # Print train score
+    print(clf.score(fmri_test[str(i)], contrast_test[str(i)]))

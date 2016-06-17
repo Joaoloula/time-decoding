@@ -13,49 +13,49 @@ n_scans = 1452
 n_sessions = 12
 n_c = 5  # number of Cs to use in logistic regression CV
 n_jobs = 2  # number of jobs to use in logistic regression CV
+n_subjects = 1
 
 # PREPROCESSING
 
 # Import all subjects from the haxby dataset
-haxby_dataset = datasets.fetch_haxby(n_subjects=6)
+haxby_dataset = datasets.fetch_haxby(n_subjects=n_subjects)
 
 # Create categories
 categories = ['face', 'house', 'bottle', 'chair']
 
 # Create sessions id
-sessions_id = [x/(n_scans/n_sessions) for x in range(n_scans)]
+sessions_id = [x / (n_scans / n_sessions) for x in range(n_scans)]
 
 # Initialize series and fmri dictionaries
 series = {}
 fmri = {}
 
-# Loop through all subjects
-for i in range(6):
+
+def read_data(subject):
+    """Returns indiviudal images, labels and session id for subject subject"""
     # Read labels
-    labels = np.recfromcsv(haxby_dataset.session_target[i], delimiter=" ")
+    labels = np.recfromcsv(haxby_dataset.session_target[subject],
+                           delimiter=" ")
+    sessions_id = labels['chunks']
     target = labels['labels']
+    categories = np.unique(target)
 
     # Initialize series array
-    series[str(i)] = np.zeros(n_scans)
-    # Fill it up with category stimuli
-    for j in range(len(categories)):
-        for k in range(len(n_scans)):
-            if target[k] == categories[k]:
-                series[str(i)] = j + 1
+    series_ = np.zeros(n_scans)
+    for c, category in enumerate(categories):
+        series_[target == category] = c + 1
 
     # Read activity data
     # Standardize and detrend
-    mask_filename = haxby_dataset.mask_vt[i]
+    mask_filename = haxby_dataset.mask_vt[subject]
     nifti_masker = NiftiMasker(mask_img=mask_filename, standardize=True,
                                detrend=True, sessions=sessions_id)
-    func_filename = haxby_dataset.func[i]
-    fmri[str(i)] = nifti_masker.fit_transform(func_filename)
+    func_filename = haxby_dataset.func[subject]
+    # fmri[str(subject)] = nifti_masker.fit_transform(func_filename)
+    # series[str(subject)] = series_
+    return nifti_masker.fit_transform(func_filename), series_, sessions_id
 
 # MODEL
-
-# Initialize Leave P Label Out cross validation
-lplo = LeavePLabelOut(sessions_id, p=2)
-
 # Initialize train and test sets
 series_train = {}
 series_test = {}
@@ -69,9 +69,13 @@ score_count = 0
 
 sns.set_style('darkgrid')
 f, axes = plt.subplots(3, 2)
-for i in range(6):
+for i in range(n_subjects):
     # Flag for fitting the first example for each subject
     first = True
+
+    fmri, series, sessions_id = read_data(i)
+    # Initialize Leave P Label Out cross validation
+    lplo = LeavePLabelOut(sessions_id, p=2)
 
     # Divide in train and test sets
     for train_index, test_index in lplo:
@@ -99,12 +103,13 @@ for i in range(6):
             # Make array with only face trials
             faces = [1 if x == 1 else 0 for x in series_test[str(i)]]
             # Plot it along with the probability prediction for the face label
-            axes[i % 3, i/3].plot(range(len(prediction_proba)),
+            axes[i % 3, i / 3].plot(range(len(prediction_proba)),
                                   faces)
-            axes[i % 3, i/3].plot(range(len(prediction_proba)),
+            axes[i % 3, i / 3].plot(range(len(prediction_proba)),
                                   prediction_proba[:, 1])
             # Add subject number and train score to title
-            axes[i % 3, i/3].set_title('Subject %(subject)d, score %(score).2f'
+            axes[i % 3, i / 3].set_title(
+                'Subject %(subject)d, score %(score).2f'
                 % {'subject': i,
                    'score': log.score(fmri_test[str(i)], series_test[str(i)])}
             )
@@ -115,7 +120,7 @@ for i in range(6):
         score_count += 1
 
 # Calculate and print the mean score
-mean_score = mean_score/score_count
+mean_score = mean_score / score_count
 print("The accuracy is %.4f" % mean_score)
 
 plt.show()

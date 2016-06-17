@@ -69,49 +69,49 @@ score_count = 0
 
 sns.set_style('darkgrid')
 f, axes = plt.subplots(3, 2)
-for i in range(n_subjects):
+for subject in range(n_subjects):
     # Flag for fitting the first example for each subject
     first = True
 
-    fmri, series, sessions_id = read_data(i)
+    fmri, series, sessions_id = read_data(subject)
     # Initialize Leave P Label Out cross validation
     lplo = LeavePLabelOut(sessions_id, p=2)
 
     # Divide in train and test sets
     for train_index, test_index in lplo:
-        series_train[str(i)] = series[str(i)][train_index]
-        series_test[str(i)] = series[str(i)][test_index]
-        fmri_train[str(i)] = fmri[str(i)][train_index]
-        fmri_test[str(i)] = fmri[str(i)][test_index]
+        series_train = series[train_index]
+        series_test = series[test_index]
+        fmri_train = fmri[train_index]
+        fmri_test = fmri[test_index]
 
         # Fit multinomial logistic regression
         # We choose the best C between Cs values on a logarithmic scale
         # between 1e-4 and 1e4
         log = linear_model.LogisticRegressionCV(Cs=n_c, n_jobs=n_jobs)
-        log.fit(fmri_train[str(i)], series_train[str(i)])
+        log.fit(fmri_train, series_train)
 
         # SCORE
-        mean_score += log.score(fmri_test[str(i)], series_test[str(i)])
+        mean_score += log.score(fmri_test, series_test)
 
         if first:
             # TEST
-            prediction = log.predict(fmri_test[str(i)])
-            prediction_proba = log.predict_proba(fmri_test[str(i)])
+            prediction = log.predict(fmri_test)
+            prediction_proba = log.predict_proba(fmri_test)
 
             # PLOT
 
             # Make array with only face trials
-            faces = [1 if x == 1 else 0 for x in series_test[str(i)]]
+            faces = [1 if x == 1 else 0 for x in series_test]
             # Plot it along with the probability prediction for the face label
-            axes[i % 3, i / 3].plot(range(len(prediction_proba)),
+            axes[subject % 3, subject / 3].plot(range(len(prediction_proba)),
                                   faces)
-            axes[i % 3, i / 3].plot(range(len(prediction_proba)),
+            axes[subject % 3, subject / 3].plot(range(len(prediction_proba)),
                                   prediction_proba[:, 1])
             # Add subject number and train score to title
-            axes[i % 3, i / 3].set_title(
+            axes[subject % 3, subject / 3].set_title(
                 'Subject %(subject)d, score %(score).2f'
-                % {'subject': i,
-                   'score': log.score(fmri_test[str(i)], series_test[str(i)])}
+                % {'subject': subject,
+                   'score': log.score(fmri_test, series_test)}
             )
 
             first = False

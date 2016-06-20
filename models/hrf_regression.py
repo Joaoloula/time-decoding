@@ -1,12 +1,12 @@
-# Performs multinomial logistic regression on activation data created from the
-# Haxby dataset
-# Score : 0.60 accuracy for 8 classes
+# Performs ridge regression on activation data created from the
+# Haxby dataset by estimating the hemodynamic response function
+# Score : 0.61 accuracy for 8 classes
 from sklearn.cross_validation import LeavePLabelOut
-from nilearn.input_data import NiftiMasker
+from helper_functions import read_data
+from nilearn import datasets
 from nistats import hemodynamic_models
 from sklearn import linear_model
 from sklearn import metrics
-from nilearn import datasets
 from scipy import linalg
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -44,42 +44,7 @@ hrf_matrix_test = linalg.toeplitz(hrf_filter_test, np.zeros(test_size-gap))
 # Import all subjects from the haxby dataset
 haxby_dataset = datasets.fetch_haxby(n_subjects=n_subjects)
 
-# Create sessions id
-sessions_id = [x/(n_scans/n_sessions) for x in range(n_scans)]
-
-
-def read_data(subject):
-    """Returns indiviudal images, labels and session id for subject subject"""
-    # Read labels
-    labels = np.recfromcsv(haxby_dataset.session_target[subject],
-                           delimiter=" ")
-    sessions_id = labels['chunks']
-    target = labels['labels']
-    categories = np.unique(target)
-    # Make 'rest' be the first category
-    categories = np.roll(categories,
-                         len(categories) - np.where(categories == 'rest')[0])
-
-    # Initialize series array
-    series_ = np.zeros(n_scans)
-    for c, category in enumerate(categories):
-        series_[target == category] = c
-
-    # Read activity data
-    # Standardize and detrend
-    mask_filename = haxby_dataset.mask_vt[subject]
-    nifti_masker = NiftiMasker(mask_img=mask_filename, standardize=True,
-                               detrend=True, sessions=sessions_id)
-    func_filename = haxby_dataset.func[subject]
-    # fmri[str(subject)] = nifti_masker.fit_transform(func_filename)
-    # series[str(subject)] = series_
-    return (nifti_masker.fit_transform(func_filename), series_,
-            sessions_id, categories)
-
 # MODEL
-
-# Create Leave P Label Out cross validation
-lplo = LeavePLabelOut(sessions_id, p=lplo_p)
 
 # Initialize mean score and mean_hrf_score
 mean_score = 0.
@@ -89,7 +54,11 @@ sns.set_style('darkgrid')
 figure, axes = plt.subplots(4, 2)
 for subject in range(n_subjects):
     # Read data and remove 'rest' category
-    fmri, series, sessions_id, categories = read_data(subject)
+    fmri, series, sessions_id, categories = read_data(subject, haxby_dataset,
+                                                      n_scans)
+
+    # Create Leave P Label Out cross validation
+    lplo = LeavePLabelOut(sessions_id, p=lplo_p)
 
     # Create lists to store all hrf predictions of a subject
     all_hrf_train = []

@@ -1,10 +1,13 @@
 # Performs multinomial logistic regression on activation data created from the
 # Haxby dataset
+# Score : 0.60 accuracy for 8 classes
 from sklearn.cross_validation import LeavePLabelOut
 from nilearn.input_data import NiftiMasker
 from nistats import hemodynamic_models
 from sklearn import linear_model
+from sklearn import metrics
 from nilearn import datasets
+from scipy import linalg
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
@@ -12,167 +15,168 @@ import numpy as np
 # PARAMETERS
 tr = 2.5
 n_scans = 1452
-frame_times = np.arange(n_scans) * tr
-hrf_model = 'glover'
+n_sessions = 12
+n_subjects = 6
 oversample = 1  # Only handles oversample = 1 for the moment
+plot_subject = 5  # Subject to plot
+gap = 3  # Number of scans on the gap between fmri data and stimuli on Haxby
+hrf_model = 'glover'
+
+# Train and test parameters
+lplo_p = 2  # Number of labels to leave out for cross validation
+test_size = (n_scans/n_sessions) * (lplo_p)
+train_size = n_scans - test_size
+
+# Calculate frame times
+frame_times = np.arange(n_scans) * tr
 
 # Calculate the toeplitz matrix for the discrete convolution by the HRF
-hrf_matrix = [hemodynamic_models._gamma_difference_hrf(tr,
-                                                       oversampling=oversample,
-                                                       time_length=tr*n_scans,
-                                                       onset=k)
-              for k in range(n_scans)]
-hrf_matrix = np.array(hrf_matrix)
+hrf_filter = hemodynamic_models.glover_hrf(tr, oversampling=oversample)
+hrf_filter_train = [hrf_filter[i] if i < len(hrf_filter) else 0
+                    for i in range(train_size-gap)]
+hrf_filter_test = [hrf_filter[i] if i < len(hrf_filter) else 0
+                   for i in range(test_size-gap)]
+hrf_matrix_train = linalg.toeplitz(hrf_filter_train, np.zeros(train_size-gap))
+hrf_matrix_test = linalg.toeplitz(hrf_filter_test, np.zeros(test_size-gap))
 
 # PREPROCESSING
 
 # Import all subjects from the haxby dataset
-haxby_dataset = datasets.fetch_haxby(n_subjects=6)
-
-# Create categories
-categories = ['face', 'house', 'bottle', 'chair']
+haxby_dataset = datasets.fetch_haxby(n_subjects=n_subjects)
 
 # Create sessions id
-sessions_id = [x/121 for x in range(1452)]
+sessions_id = [x/(n_scans/n_sessions) for x in range(n_scans)]
 
-# Initialize the stimuli and fmri dictionaries
-stimuli = {}
-fmri = {}
 
-# Initialize the experimental condition dictionaries
-onsets = {}
-durations = {}
-amplitudes = {}
-exp_conditions = {}
-
-# Initiliaze the signal dictionary
-signal = {}
-
-# Initialize the dictionary for each label, and the series for each category
-for i in range(6):
-    stimuli[str(i)] = {}
-    fmri[str(i)] = {}
-    onsets[str(i)] = {}
-    durations[str(i)] = {}
-    amplitudes[str(i)] = {}
-    exp_conditions[str(i)] = {}
-    signal[str(i)] = {}
-    for category in categories:
-        stimuli[str(i)][category] = []
-        onsets[str(i)][category] = []
-        durations[str(i)][category] = []
-        amplitudes[str(i)][category] = []
-        signal[str(i)][category] = []
-
-# Loop through all subjects
-for i in range(6):
+def read_data(subject):
+    """Returns indiviudal images, labels and session id for subject subject"""
     # Read labels
-    labels = np.recfromcsv(haxby_dataset.session_target[i], delimiter=" ")
+    labels = np.recfromcsv(haxby_dataset.session_target[subject],
+                           delimiter=" ")
+    sessions_id = labels['chunks']
     target = labels['labels']
+    categories = np.unique(target)
+    # Make 'rest' be the first category
+    categories = np.roll(categories,
+                         len(categories) - np.where(categories == 'rest')[0])
 
-    # Create the labeled time series, onsets, durations and amplitudes
-    for j in range(len(target)):
-        for category in categories:
-            # If a stimulus of the current category is being presented
-            if target[j] == category:
-                stimuli[str(i)][category].append(1)
-                # Detect onset
-                if j >= 1 and target[j-1] != category:
-                    onsets[str(i)][category].append(tr*j)
-                    # Suppose amplitude to be 1
-                    amplitudes[str(i)][category].append(1)
-            else:
-                stimuli[str(i)][category].append(0)
-                # Detect end of stimulus and calculate duration
-                if j >= 1 and target[j-1] == category:
-                    duration = (tr * j - onsets[str(i)][category][-1])
-                    durations[str(i)][category].append(duration)
-
-    # Summarize information in the experimental conditions and create HRFs
-    for category in categories:
-        exp_conditions[str(i)][category] = np.vstack((onsets[str(i)][category],
-                                            durations[str(i)][category],
-                                            amplitudes[str(i)][category]))
-        signal[str(i)][category], _ = hemodynamic_models.compute_regressor(
-            exp_conditions[str(i)][category], hrf_model, frame_times,
-            con_id=category, oversampling = oversample)
+    # Initialize series array
+    series_ = np.zeros(n_scans)
+    for c, category in enumerate(categories):
+        series_[target == category] = c
 
     # Read activity data
-    # Standardize and detrend per session
-    mask_filename = haxby_dataset.mask_vt[i]
+    # Standardize and detrend
+    mask_filename = haxby_dataset.mask_vt[subject]
     nifti_masker = NiftiMasker(mask_img=mask_filename, standardize=True,
                                detrend=True, sessions=sessions_id)
-    func_filename = haxby_dataset.func[i]
-    fmri[str(i)] = nifti_masker.fit_transform(func_filename)
+    func_filename = haxby_dataset.func[subject]
+    # fmri[str(subject)] = nifti_masker.fit_transform(func_filename)
+    # series[str(subject)] = series_
+    return (nifti_masker.fit_transform(func_filename), series_,
+            sessions_id, categories)
 
 # MODEL
 
 # Create Leave P Label Out cross validation
-lplo = LeavePLabelOut(sessions_id, p=2)
+lplo = LeavePLabelOut(sessions_id, p=lplo_p)
 
-# Create train and test dictionaries
-signal_train = {}
-signal_test = {}
-stimuli_train = {}
-stimuli_test = {}
-fmri_train = {}
-fmri_test = {}
+# Initialize mean score and mean_hrf_score
+mean_score = 0.
+mean_deconv_score = 0.
 
 sns.set_style('darkgrid')
-f, axes = plt.subplots(3, 2)
-for i in range(6):
-    # Create vector of all the stimuli combined
-    signal_train[str(i)] = {}
-    signal_test[str(i)] = {}
-    stimuli_train[str(i)] = {}
-    stimuli_test[str(i)] = {}
+figure, axes = plt.subplots(4, 2)
+for subject in range(n_subjects):
+    # Read data and remove 'rest' category
+    fmri, series, sessions_id, categories = read_data(subject)
 
-    # Separate data into train and test sets
-    for train_index, test_index in lplo:
-        for category in categories:
-            signal_train[str(i)][category] = signal[str(i)][category][train_index]
-            signal_test[str(i)][category] = signal[str(i)][category][test_index]
-            stimuli_train[str(i)][category] = np.array(stimuli[str(i)][category])[train_index]
-            stimuli_test[str(i)][category] = np.array(stimuli[str(i)][category])[test_index]
-        fmri_train[str(i)] = fmri[str(i)][train_index]
-        fmri_test[str(i)] = fmri[str(i)][test_index]
-        hrf_matrix_train = hrf_matrix[np.ix_(train_index, train_index)]
-        hrf_matrix_test = hrf_matrix[np.ix_(test_index, test_index)]
-    # Create the ridge regression dictionary
-    ridge = {}
+    # Create lists to store all hrf predictions of a subject
+    all_hrf_train = []
+    all_hrf_test = []
 
-    for category in categories:
+    for category in range(len(categories)):
+        # Create experimental conditions
+        onsets = [scan*tr for scan in range(1, len(series))
+                  if series[scan] == category and series[scan-1] != category]
+        durations = np.zeros(len(onsets))
+        durations.fill(9*tr)  # All stimulus last 9 scans
+        amplitudes = np.zeros(len(onsets))
+        amplitudes.fill(1)  # Normalized amplitude
+        exp_conditions = np.vstack((onsets, durations, amplitudes))
+        # Compute hrf signal
+        signal, _ = hemodynamic_models.compute_regressor(exp_conditions,
+                                                         hrf_model,
+                                                         frame_times,
+                                                         oversampling=oversample
+                                                         )
+        for train_index, test_index in lplo:
+            # Separate data into train and test sets
+            fmri_train = fmri[train_index]
+            fmri_test = fmri[test_index]
+            series_train = series[train_index]
+            series_test = series[test_index]
+            signal_train = signal[train_index]
+            signal_test = signal[test_index]
+            # Do only one CV step for faster prototyping
+
         # Fit multinomial logistic regression
         # We choose the best C between Cs values on a logarithmic scale
         # between 1e-4 and 1e4
-        ridge[category] = linear_model.RidgeCV()
-        ridge[category].fit(fmri_train[str(i)], signal_train[str(i)][category])
+        # We have to remember to correct for the gap in the Haxby dataset
+        ridge = linear_model.RidgeCV()
+        ridge.fit(fmri_train[:-gap], signal_train[gap:])
 
         # HRF function prediction
-        hrf_prediction_train = ridge[category].predict(fmri_train[str(i)])
+        hrf_prediction_train = ridge.predict(fmri_train[:-gap])
+        hrf_prediction_test = ridge.predict(fmri_test[:-gap])
 
-        # Fit the deconvolution ridge regression
-        deconv_ridge = linear_model.RidgeCV()
-        deconv_ridge.fit(hrf_matrix_train, hrf_prediction_train)
+        # Deconvolve the hrf signals to obtain an approximation of the original
+        # stimulus function
+        ridge.fit(hrf_matrix_train, hrf_prediction_train)
+        hrf_prediction_train = ridge.coef_[0]
+        ridge.fit(hrf_matrix_test, hrf_prediction_test)
+        hrf_prediction_test = ridge.coef_[0]
+        all_hrf_train.append(hrf_prediction_train)
+        all_hrf_test.append(hrf_prediction_test)
 
-        # Make prediction for the test set and calculate score
-        hrf_prediction_test = ridge[category].predict(fmri_test[str(i)])
-        stim_prediction = deconv_ridge.predict(hrf_matrix_test)
-        score = deconv_ridge.score(hrf_prediction_test,
-                                   stimuli_test[str(i)][category])
+    all_hrf_train = np.asarray(all_hrf_train).T
+    all_hrf_test = np.asarray(all_hrf_test).T
 
-        if category=='house':
-            # PLOT
-            # Plot it along with the probability prediction for the face label
-            axes[i % 3, i/3].plot(range(len(stim_prediction)),
-                                  stim_prediction)
+    # Fit the ridge classifier
+    ridge_class = linear_model.RidgeClassifierCV()
+    ridge_class.fit(all_hrf_train, series_train[gap:])
 
-            # Add subject number and train score to title
-            axes[i % 3, i/3].set_title('Subject %(subject)d, score %(score).2f'
-                % {
-                'subject': i,
-                'score': ridge[category].score(fmri_test[str(i)],
-                                     signal_test[str(i)]['house'])
-                }
-                )
+    # Make prediction for the test set and calculate score
+    class_prediction = ridge_class.predict(all_hrf_test)
+    score = ridge_class.score(all_hrf_test, series_test[gap:])
+
+    mean_score += score
+
+    # PLOT
+    # For better visualization, it's interesting to project both the stimuli
+    # and the regressed probabilities on only one of the classes and then
+    # plot the result
+
+    if subject == plot_subject:
+        for category in range(1, len(categories)):
+            # Filter only the face stimuli and regression
+            cat_stimuli = [int(x == category) for x in series_test[gap:]]
+
+            r2_score = metrics.r2_score(cat_stimuli,
+                                        all_hrf_test[:, category])
+            x, y = (category - 1) % 4, (category - 1) / 4
+            axes[x, y].plot(all_hrf_test[:, category])
+            axes[x, y].plot(cat_stimuli)
+            axes[x, y].set_title('Category %(cat)s, R2 score %(r2score).2f: '
+                                 % {'cat': categories[category],
+                                    'r2score': r2_score}
+                                 )
+
+mean_score = mean_score/n_subjects
+figure.suptitle('Stimuli and predictions for subject %(subject)d: '
+                % {'subject': plot_subject} +
+                'total accuracy %(total_score).2f'
+                % {'total_score': mean_score})
+
 plt.show()

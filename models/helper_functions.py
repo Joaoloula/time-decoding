@@ -1,4 +1,4 @@
-erom nilearn.input_data import NiftiMasker
+from nilearn.input_data import NiftiMasker
 import numpy as np
 
 

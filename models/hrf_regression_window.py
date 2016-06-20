@@ -46,6 +46,7 @@ for subject in range(n_subjects):
                                       time_window * np.shape(fmri)[1])
     series = series[: -time_window]
     sessions_id = sessions_id[: -time_window]
+
     # Initialize Leave P Label Out cross validation
     lplo = LeavePLabelOut(sessions_id, p=2)
 
@@ -56,36 +57,36 @@ for subject in range(n_subjects):
         fmri_window_train = fmri_window[train_index]
         fmri_window_test = fmri_window[test_index]
 
-        # Fit multinomial logistic regression
-        # We choose the best C between Cs values on a logarithmic scale
-        # between 1e-4 and 1e4
-        log = linear_model.LogisticRegressionCV(Cs=n_c, n_jobs=n_jobs)
-        log.fit(fmri_window_train, series_train)
+    # Fit multinomial logistic regression
+    # We choose the best C between Cs values on a logarithmic scale
+    # between 1e-4 and 1e4
+    log = linear_model.LogisticRegressionCV(Cs=n_c, n_jobs=n_jobs)
+    log.fit(fmri_window_train, series_train)
 
-        # SCORE
-        mean_score += log.score(fmri_window_test, series_test)
+    # SCORE
+    mean_score += log.score(fmri_window_test, series_test)
 
-        # TEST
-        prediction = log.predict(fmri_window_test)
-        prediction_proba = log.predict_proba(fmri_window_test)
+    # TEST
+    prediction = log.predict(fmri_window_test)
+    prediction_proba = log.predict_proba(fmri_window_test)
 
-        # PLOT
-        if subject == plot_subject:
-            for k in range(len(categories)):
-                # Create stimulus array for the category
-                cat_stimuli = [int(x == k) for x in series_test]
-                # Plot it along with the probability prediction
-                x, y = k % 3, k / 3
-                axes[x, y].plot(cat_stimuli)
-                axes[x, y].plot(prediction_proba[:, k])
+    # PLOT
+    if subject == plot_subject:
+        for k in range(len(categories)):
+            # Create stimulus array for the category
+            cat_stimuli = [int(x == k) for x in series_test]
+            # Plot it along with the probability prediction
+            x, y = k % 3, k / 3
+            axes[x, y].plot(cat_stimuli)
+            axes[x, y].plot(prediction_proba[:, k])
 
-                # Calculate R2 score for stimulus approximation
-                r2_score = metrics.r2_score(cat_stimuli, prediction_proba[:, k])
+            # Calculate R2 score for stimulus approximation
+            r2_score = metrics.r2_score(cat_stimuli, prediction_proba[:, k])
 
-                # Add subject number and train score to title
-                axes[x, y].set_title('Category %(cat)s, R2 score %(score).2f'
-                                     % {'cat': categories[k], 'score': r2_score}
-                                     )
+            # Add subject number and train score to title
+            axes[x, y].set_title('Category %(cat)s, R2 score %(score).2f'
+                                 % {'cat': categories[k], 'score': r2_score}
+                                 )
 
     # Update score counter
     score_count += 1

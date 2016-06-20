@@ -1,10 +1,13 @@
 # Performs multinomial logistic regression on activation data created from the
 # Haxby dataset
+# Accuracy: 0.74 without confounds
+# 0.68 with 5 confounds
 from sklearn.cross_validation import LeavePLabelOut
+from helper_functions import read_data
 from sklearn import linear_model
 from sklearn import metrics
 from nilearn import datasets
-from helper_functions import read_data
+from nilearn import signal
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -14,6 +17,7 @@ n_sessions = 12
 n_c = 5  # number of Cs to use in logistic regression CV
 n_jobs = 2  # number of jobs to use in logistic regression CV
 n_subjects = 6
+n_confounds = 3
 plot_subject = 5  # ID of the subject to plot
 
 # PREPROCESSING
@@ -36,6 +40,9 @@ f, axes = plt.subplots(3, 3)
 for subject in range(n_subjects):
     fmri, series, sessions_id, categories = read_data(subject, haxby_dataset,
                                                       n_scans)
+    # Calculate highest variance confounds
+    confounds = signal.high_variance_confounds(fmri, n_confounds=n_confounds)
+    # fmri = signal.clean(fmri, confounds=confounds)
 
     # Initialize Leave P Label Out cross validation
     lplo = LeavePLabelOut(sessions_id, p=2)
@@ -79,7 +86,7 @@ for subject in range(n_subjects):
                                      )
 
         # Update score counter
-        score_count += 1
+    score_count += 1
 
 # Calculate and print the mean score
 mean_score = mean_score / score_count

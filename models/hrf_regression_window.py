@@ -15,7 +15,7 @@ n_scans = 1452
 n_sessions = 12
 n_c = 5  # number of Cs to use in logistic regression CV
 n_jobs = 2  # number of jobs to use in logistic regression CV
-n_subjects = 6
+n_subjects = 1
 plot_subject = 5  # ID of the subject to plot
 time_window = 5
 
@@ -31,8 +31,9 @@ fmri = {}
 # MODEL
 
 # Initialize mean score and score counter
-mean_score = 0.
-score_count = 0
+subject_accuracies = np.zeros(n_subjects)
+categories_r2_scores = np.zeros((n_subjects, 9))
+count = 1
 
 sns.set_style('darkgrid')
 f, axes = plt.subplots(3, 3)
@@ -57,46 +58,53 @@ for subject in range(n_subjects):
         fmri_window_train = fmri_window[train_index]
         fmri_window_test = fmri_window[test_index]
 
-    # Fit multinomial logistic regression
-    # We choose the best C between Cs values on a logarithmic scale
-    # between 1e-4 and 1e4
-    log = linear_model.LogisticRegressionCV(Cs=n_c, n_jobs=n_jobs)
-    log.fit(fmri_window_train, series_train)
+        # Fit multinomial logistic regression
+        # We choose the best C between Cs values on a logarithmic scale
+        # between 1e-4 and 1e4
+        log = linear_model.LogisticRegressionCV(Cs=n_c, n_jobs=n_jobs)
+        log.fit(fmri_window_train, series_train)
 
-    # SCORE
-    mean_score += log.score(fmri_window_test, series_test)
+        # SCORE
+        subject_accuracies[subject] += log.score(fmri_window_test, series_test)
 
-    # TEST
-    prediction = log.predict(fmri_window_test)
-    prediction_proba = log.predict_proba(fmri_window_test)
+        # TEST
+        prediction = log.predict(fmri_window_test)
+        prediction_proba = log.predict_proba(fmri_window_test)
 
-    # PLOT
-    if subject == plot_subject:
+        # R2 SCORES
+        r2_scores = np.zeros(len(categories))
         for k in range(len(categories)):
             # Create stimulus array for the category
             cat_stimuli = [int(x == k) for x in series_test]
-            # Plot it along with the probability prediction
-            x, y = k % 3, k / 3
-            axes[x, y].plot(cat_stimuli)
-            axes[x, y].plot(prediction_proba[:, k])
 
             # Calculate R2 score for stimulus approximation
-            r2_score = metrics.r2_score(cat_stimuli, prediction_proba[:, k])
+            r2_scores[k] = metrics.r2_score(cat_stimuli, prediction_proba[:, k])
 
-            # Add subject number and train score to title
-            axes[x, y].set_title('Category %(cat)s, R2 score %(score).2f'
-                                 % {'cat': categories[k], 'score': r2_score}
-                                 )
+        categories_r2_scores[subject] += r2_scores
 
-    # Update score counter
-    score_count += 1
+        # PLOT
+        if subject == plot_subject:
+            for k in range(len(categories)):
+                # Create stimulus array for the category
+                cat_stimuli = [int(x == k) for x in series_test]
+                # Plot it along with the probability prediction
+                x, y = k % 3, k / 3
+                axes[x, y].plot(cat_stimuli)
+                axes[x, y].plot(prediction_proba[:, k])
+
+                # Calculate R2 score for stimulus approximation
+                r2_score = metrics.r2_score(cat_stimuli, prediction_proba[:, k])
+
 
 # Calculate and print the mean score
-mean_score = mean_score / score_count
-f.suptitle('Predictions and R2 scores for subject 5, time window of %d, '
-           % time_window +
-           'accuracy = %.2f'
-           % mean_score)
-print("The accuracay is %.4f" % mean_score)
+# f.suptitle('Predictions and R2 scores for subject 5, time window of %d, '
+#            % time_window +
+#            'accuracy = %.2f'
+#            % mean_score)
+
+for sub in range(n_subjects):
+    subject_accuracies[sub] = subject_accuracies[sub]/66
+    for cat in range(len(categories)):
+        categories_r2_scores[sub][cat] = [sub][cat]/66
 
 plt.show()

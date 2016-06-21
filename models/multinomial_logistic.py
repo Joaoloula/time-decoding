@@ -18,7 +18,7 @@ n_c = 5  # number of Cs to use in logistic regression CV
 n_jobs = 2  # number of jobs to use in logistic regression CV
 n_subjects = 6
 n_confounds = 3
-plot_subject = 5  # ID of the subject to plot
+plot_subject = 9  # ID of the subject to plot
 
 # PREPROCESSING
 
@@ -31,9 +31,10 @@ fmri = {}
 
 # MODEL
 
-# Initialize mean score and score counter
-mean_score = 0.
-score_count = 0
+# Initialize lists for accuracies per subject and r2 scores per category per
+# subject
+subject_accuracies = []
+categories_r2_scores = []
 
 sns.set_style('darkgrid')
 f, axes = plt.subplots(3, 3)
@@ -61,15 +62,26 @@ for subject in range(n_subjects):
         log.fit(fmri_train, series_train)
 
         # SCORE
-        mean_score += log.score(fmri_test, series_test)
+        subject_accuracies.append(log.score(fmri_test, series_test))
 
         # TEST
         prediction = log.predict(fmri_test)
         prediction_proba = log.predict_proba(fmri_test)
 
+        # R2 SCORES
+        r2_scores = []
+        for k in range(len(categories)):
+                # Create array for the given stimulus
+                cat_stimuli = [int(x == k) for x in series_test]
+                # Calculate R2 score for stimulus approximation
+                r2_scores.append(metrics.r2_score(cat_stimuli,
+                                                  prediction_proba[:, k]))
+
+                categories_r2_scores.append(r2_scores)
+
         # PLOT
         if subject == plot_subject:
-            for k in range(9):
+            for k in range(len(categories)):
                 # Create array for the given stimulus
                 cat_stimuli = [int(x == k) for x in series_test]
                 # Plot it along with the probability prediction
@@ -85,13 +97,8 @@ for subject in range(n_subjects):
                                      % {'cat': categories[k], 'score': r2_score}
                                      )
 
-        # Update score counter
-    score_count += 1
-
 # Calculate and print the mean score
-mean_score = mean_score / score_count
-f.suptitle('Predictions and R2 scores for subject 5, accuracy = %.2f'
-           % mean_score)
-print("The accuracay is %.4f" % mean_score)
+# f.suptitle('Predictions and R2 scores for subject 5, accuracy = %.2f'
+#            % mean_score)
 
 plt.show()

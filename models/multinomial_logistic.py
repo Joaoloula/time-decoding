@@ -19,6 +19,7 @@ n_jobs = 2  # number of jobs to use in logistic regression CV
 n_subjects = 6
 n_confounds = 3
 plot_subject = 9  # ID of the subject to plot
+model = 'ridge'  # 'ridge' for Ridge CV or 'log' for logistic regression CV
 
 # PREPROCESSING
 
@@ -34,7 +35,7 @@ fmri = {}
 # Initialize lists for accuracies per subject and r2 scores per category per
 # subject
 subject_accuracies = []
-categories_r2_scores = []
+categories_r2_scores = [0]*9
 
 sns.set_style('darkgrid')
 f, axes = plt.subplots(3, 3)
@@ -55,50 +56,56 @@ for subject in range(n_subjects):
         fmri_train = fmri[train_index]
         fmri_test = fmri[test_index]
 
-        # Fit multinomial logistic regression
-        # We choose the best C between Cs values on a logarithmic scale
-        # between 1e-4 and 1e4
-        log = linear_model.LogisticRegressionCV(Cs=n_c, n_jobs=n_jobs)
-        log.fit(fmri_train, series_train)
+        if model == 'log':
+            # Fit multinomial logistic regression
+            # We choose the best C between Cs values on a logarithmic scale
+            # between 1e-4 and 1e4
+            log = linear_model.LogisticRegressionCV(Cs=n_c, n_jobs=n_jobs)
+            log.fit(fmri_train, series_train)
 
-        # SCORE
-        subject_accuracies.append(log.score(fmri_test, series_test))
+            # SCORE
+            subject_accuracies.append(log.score(fmri_test, series_test))
 
-        # TEST
-        prediction = log.predict(fmri_test)
-        prediction_proba = log.predict_proba(fmri_test)
+            # TEST
+            prediction = log.predict(fmri_test)
+            prediction_proba = log.predict_proba(fmri_test)
 
-        # R2 SCORES
-        r2_scores = []
-        for k in range(len(categories)):
-                # Create array for the given stimulus
-                cat_stimuli = [int(x == k) for x in series_test]
-                # Calculate R2 score for stimulus approximation
-                r2_scores.append(metrics.r2_score(cat_stimuli,
-                                                  prediction_proba[:, k]))
+            # PLOT
+            if subject == plot_subject:
+                for k in range(len(categories)):
+                    # Create array for the given stimulus
+                    cat_stimuli = [int(x == k) for x in series_test]
+                    # Plot it along with the probability prediction
+                    x, y = k % 3, k / 3
+                    axes[x, y].plot(cat_stimuli)
+                    axes[x, y].plot(prediction_proba[:, k])
 
-                categories_r2_scores.append(r2_scores)
+                    # Calculate R2 score for stimulus approximation
+                    r2_score = metrics.r2_score(cat_stimuli,
+                                                prediction_proba[:, k])
 
-        # PLOT
-        if subject == plot_subject:
+                    # Add subject number and train score to title
+                    axes[x, y].set_title('Category %(cat)s, R2 score %(score).2f'
+                                         % {'cat': categories[k], 'score': r2_score}
+                                         )
+
+        if model == 'ridge':
+            alphas = [0.1, 1, 10, 100, 1000]
+            ridge = linear_model.RidgeCV(alphas=alphas)
             for k in range(len(categories)):
-                # Create array for the given stimulus
-                cat_stimuli = [int(x == k) for x in series_test]
-                # Plot it along with the probability prediction
-                x, y = k % 3, k / 3
-                axes[x, y].plot(cat_stimuli)
-                axes[x, y].plot(prediction_proba[:, k])
+                    # Create array for the given stimulus
+                    cat_stimuli_train = [int(cat == k) for cat in series_train]
+                    cat_stimuli_test = [int(cat == k) for cat in series_test]
 
-                # Calculate R2 score for stimulus approximation
-                r2_score = metrics.r2_score(cat_stimuli, prediction_proba[:, k])
+                    # Perform Ridge regression
+                    ridge.fit(fmri_train, cat_stimuli_train)
+                    categories_r2_scores[k] += ridge.score(fmri_test,
+                                                           cat_stimuli_test)
 
-                # Add subject number and train score to title
-                axes[x, y].set_title('Category %(cat)s, R2 score %(score).2f'
-                                     % {'cat': categories[k], 'score': r2_score}
-                                     )
+        print('processing subject ' + str(subject))
 
 # Calculate and print the mean score
-# f.suptitle('Predictions and R2 scores for subject 5, accuracy = %.2f'
-#            % mean_score)
+f.suptitle('Predictions and R2 scores for subject %d, accuracy = %.2f'
+           % (plot_subject, subject_accuracies[plot_subject]))
 
 plt.show()

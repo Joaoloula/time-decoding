@@ -1,4 +1,5 @@
 *.swp
 *.p
 *.pyc
+*.lprof
 models/hrf_regression_data_driven.py

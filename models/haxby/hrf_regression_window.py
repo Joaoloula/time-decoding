@@ -1,6 +1,7 @@
 # Performs multinomial logistic regression on activation data created from the
 # Haxby dataset, using a custom time window
 # Accuracy: 0.89 with 8 categories
+from hrf_estimation.savitzky_golay import savgol_filter
 from sklearn.cross_validation import LeavePLabelOut
 from sklearn import linear_model
 from sklearn import metrics
@@ -98,8 +99,12 @@ for subject in range(n_subjects):
 
                 # Fit the Ridge regression
                 ridge.fit(fmri_window_train, cat_stimuli_train)
-                categories_r2_scores[k] += ridge.score(fmri_window_test,
-                                                       cat_stimuli_test)
+                prediction = ridge.predict(fmri_window_test)
+                prediction = savgol_filter(prediction, 7, 3)
+                categories_r2_scores[k] += metrics.r2_score(cat_stimuli_test,
+                                                            prediction)
+
+        break
 
     print('processing subject ' + str(subject))
 

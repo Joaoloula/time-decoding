@@ -9,7 +9,7 @@ def read_data(subject, haxby_dataset, n_scans):
     sessions_id = labels['chunks']
     target = labels['labels']
     categories = np.unique(target)
-    # Make 'rest' be the first category
+    # Make 'rest' be the first category in the list
     categories = np.roll(categories,
                          len(categories) - np.where(categories == 'rest')[0])
 
@@ -28,3 +28,17 @@ def read_data(subject, haxby_dataset, n_scans):
     # series[str(subject)] = series_
     return (nifti_masker.fit_transform(func_filename), series_,
             sessions_id, categories)
+
+
+def conditions_onsets(series, categories, tr):
+    """ Creates conditions and onsets from series, categories, number of scans
+    and temporal resolution """
+    onsets = []
+    con_id = []
+    n_scans = len(series)
+    for scan in range(1, n_scans):
+        for category in range(len(categories)):
+            if series[scan] == category and series[scan - 1] != category:
+                onsets.append(scan*tr)
+                con_id.append(categories[category])
+    return con_id, onsets

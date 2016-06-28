@@ -36,12 +36,7 @@ for subject in range(n_subjects):
     fmri, series, sessions_id, categories = read_data(subject, haxby_dataset,
                                                       n_scans)
     # Apply a time window of 'time_window'
-    fmri_window = np.asarray([fmri[scan: scan + time_window]
-                              for scan in range(len(fmri) - time_window)])
-    fmri_window = fmri_window.reshape((n_scans - time_window),
-                                      time_window * np.shape(fmri)[1])
-    series = series[: -time_window]
-    sessions_id = sessions_id[: -time_window]
+    fmri, series, sessions_id = apply_time_window(fmri, series, sessions_id)
 
     # Convert 'series' to one-hot encoding
     one_hot_series = np.zeros((n_scans - time_window, len(categories)))

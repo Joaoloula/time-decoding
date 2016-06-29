@@ -2,6 +2,7 @@ from nistats.design_matrix import make_design_matrix
 from nilearn.input_data import NiftiMasker
 from sklearn import linear_model
 from sklearn import metrics
+import pandas as pd
 import numpy as np
 
 
@@ -20,6 +21,7 @@ def read_data(subject, haxby_dataset):
 
     Returns
     -------
+
     fmri: numpy array of shape [n_scans, n_voxels]
         data from the fmri sessions
 
@@ -58,9 +60,9 @@ def read_data(subject, haxby_dataset):
     return fmri, series, sessions_id, categories
 
 
-def conditions_onsets(series, categories, tr):
+def create_paradigm(series, categories, tr):
     """
-    Generates conditions and onsets for a given experiment.
+    Generates the experimental paradigm for a given set of events.
 
     Parameters
     ----------
@@ -76,22 +78,27 @@ def conditions_onsets(series, categories, tr):
 
     Returns
     -------
-    con_id: numpy array of shape [n_events]
-        identifier for the conditions of each onset
 
-    onsets: numpy array of shape [n_events]
-        time of the onset of each event
+    paradigm: pandas DataFrame
+        experimental paradigm, contains the following arrays of shape [n_events]
 
+            onset: contains the time of the onset of each event
+            name: contains the name of the condition of each event
+            duration: contains the duration of each event
     """
     onsets = []
     con_id = []
     n_scans = len(series)
     for scan in range(1, n_scans):
-        for category in range(len(categories)):
+        for category in range(1, len(categories)):  # exclude 'rest'
             if series[scan] == category and series[scan - 1] != category:
                 onsets.append(scan * tr)
                 con_id.append(categories[category])
-    return con_id, onsets
+
+    paradigm = pd.DataFrame({'onset': onsets, 'name': con_id,
+                             'duration': np.repeat(9 * tr, len(onsets))})
+
+    return paradigm
 
 
 def apply_time_window(fmri, series, sessions_id, time_window=8, delay=3):
@@ -166,12 +173,12 @@ def fit_log(fmri_train, fmri_test, series_train, series_test, n_c, n_jobs=2):
     return prediction, prediction_proba, accuracy
 
 
-def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test, n_alpha,
-              cutoff=24):
+def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test, paradigm=None,
+              cutoff=0, n_alpha=5):
     """
     Fits a Ridge regression on the data, using cross validation to choose the
     value of alpha. Also applies a low-pass filter using a Discrete Cosine
-    Transform.
+    Transform and regresses out confounds.
 
     Parameters
     ----------
@@ -188,45 +195,54 @@ def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test, n_alpha,
     one_hot_test: numpy array of shape [n_scans]
         time series of the test stimuli with one-hot encoding
 
-    n_alpha: int
-        number of alphas to test (logarithmically distributed around 1)
+    paradigm: pandas DataFrame
+        experimental paradigm, as implemented in nistats. See 'create_paradigm'
 
     cutoff: float
-        period (in seconds) of the cutoff for the low-pass filter
+        period (in seconds) of the cutoff for the low-pass filter.
+        Defaults to 0 (no filtering).
+
+    n_alpha: int
+        number of alphas to test (logarithmically distributed around 1).
+        Defaults to 5.
 
     Returns
     -------
 
-    fmri_window: numpy array of shape [n_scans - (time_window + delay),
-    n_voxels]
-        data from the fmri sessions corrected for the time window and the delay
+    prediction: numpy array of size [n_categories, n_test_scans]
+        model prediction for the test fmri data
 
-    series_window: numpy array of shape [n_scans - (time_window + delay)]
-        time series of the stimuli, coded as ints from 0 to 8, corrected for the
-        time window and the delay
-
-    sessions_id_window: numpy array of shape [n_scans - (time_window + delay)]
-        identifications of the sessions each scan belongs to (12 in total),
-        corrected for the time window and the delay
+    score: numpy array of size [n_categories]
+        prediction r2 score for each category
     """
     # Create drifts for each session separately, then stack to obtain drifts
     # for training and testing
-    session_drift = 100 * (make_design_matrix(2.5 * np.arange(0, 121),
-                                              drift_model='cosine',
-                                              period_cut=cutoff
-                                              ).as_matrix()).tolist()
+    if cutoff != 0:
+        session_drift = 1 * (make_design_matrix(2.5 * np.arange(0, 121),
+                                                hrf_model='fir',
+                                                drift_model='cosine',
+                                                period_cut=cutoff,
+                                                paradigm=paradigm
+                                                ).as_matrix()).tolist()
 
-    train_drift = (session_drift * 10)[:len(fmri_train)]
-    test_drift = (session_drift * 2)[:len(fmri_test)]
+        train_drift = np.asarray((session_drift * 10)[:len(fmri_train)])
+
+        # Correct fmri signal and one-hot matrices using the drifts
+        DDT_inv = np.linalg.pinv(np.dot(train_drift, train_drift.T))
+        correction = np.dot(np.dot(DDT_inv, train_drift), train_drift.T)
+
+        fmri_train = fmri_train - np.dot(correction, fmri_train)
+        one_hot_train = one_hot_train - np.dot(correction, one_hot_train)
+
     # Create alphas
     alphas = np.logspace(n_alpha/2, n_alpha - (n_alpha/2), num=n_alpha)
 
     # Fit and predict
     ridge = linear_model.RidgeCV(alphas=alphas)
-    ridge.fit(np.hstack((fmri_train, train_drift)), one_hot_train)
-    predict = ridge.predict(np.hstack((fmri_test, np.zeros_like(test_drift))))
+    ridge.fit(fmri_train, one_hot_train)
+    prediction = ridge.predict(fmri_test)
 
     # Score
-    score = metrics.r2_score(one_hot_test, predict, multioutput='raw_values')
+    score = metrics.r2_score(one_hot_test, prediction, multioutput='raw_values')
 
-    return predict, score
+    return prediction, score

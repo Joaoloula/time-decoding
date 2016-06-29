@@ -2,7 +2,6 @@
 # Haxby dataset, using a custom time window
 # Accuracy: 0.89 with 8 categories
 # from hrf_estimation.savitzky_golay import savgol_filter
-from nistats.design_matrix import make_design_matrix
 from sklearn.cross_validation import LeavePLabelOut
 from nilearn import datasets
 import helper_functions as hf
@@ -16,6 +15,7 @@ n_c = 5  # number of Cs to use in logistic regression CV
 n_subjects = 6
 plot_subject = 0  # ID of the subject to plot
 time_window = 8
+cutoff = 0
 delay = 3  # Correction of the fmri scans in relation to the stimuli
 model = 'ridge'  # 'ridge' for Ridge CV, 'log' for logistic regression CV
 
@@ -26,12 +26,11 @@ haxby_dataset = datasets.fetch_haxby(n_subjects=n_subjects)
 # MODEL
 # Initialize mean score and score counter
 if model == 'log':
-    mean_scores = 0
+    all_scores = np.zeros(n_subjects)
 
 elif model == 'ridge':
-    mean_scores = np.zeros(9)
-
-count = 0
+    all_scores = np.zeros((n_subjects, 9))
+    softmax_scores = np.zeros((n_subjects, 9))
 
 sns.set_style('darkgrid')
 f, axes = plt.subplots(3, 3)
@@ -42,12 +41,7 @@ for subject in range(n_subjects):
                                                      time_window=time_window,
                                                      delay=delay)
 
-    # Normalize
-    # fmri /= np.linalg.norm(fmri, axis=0)
-
-    # Create drifts for one session
-    drifts_train = make_design_matrix(np.arange(0, 1205), drift_model='cosine')
-    drifts_test = make_design_matrix(np.arange(0, 239), drift_model='cosine')
+    paradigm = hf.create_paradigm(series, categories, tr=2.5)
 
     # Initialize Leave P Label Out cross validation
     lplo = LeavePLabelOut(sessions_id, p=2)
@@ -67,11 +61,11 @@ for subject in range(n_subjects):
                 fmri_train, fmri_test, series_train, series_test, n_c=4)
 
         elif model == 'ridge':
-            prediction, score = hf.fit_ridge(
-                fmri_train, fmri_test, one_hot_train, one_hot_test, n_alpha=n_c,
-                cutoff=6)
+            prediction, score = hf.fit_ridge(fmri_train, fmri_test,
+                                             one_hot_train, one_hot_test,
+                                             paradigm=paradigm, cutoff=cutoff,
+                                             n_alpha=n_c)
 
-            noise = prediction - _
         # PLOT
         if subject == plot_subject:
             for k in range(len(categories)):
@@ -80,19 +74,19 @@ for subject in range(n_subjects):
                 axes[x, y].plot(one_hot_test[:, k])
                 axes[x, y].plot(prediction[:, k])
                 axes[x, y].set_title('Category {cat}, score {score:.2f}'
-                                     .format(cat=categories[k], score=score[k]))
+                                     .format(cat=categories[k], score=score[k]),
+                                     fontsize=16)
 
-        mean_scores += score
-        count += 1
+        all_scores[subject] = score
         break  # Only run one CV step per subject for fast prototyping
 
     print('processing subject ' + str(subject))
 
 # Calculate and print the mean score
 f.suptitle('Predictions and scores of %s model for subject %d, '
-           % (model, plot_subject) + 'time window of %d scans ' % (time_window),
+           % (model, plot_subject) + 'time window of %d scans '
+           % (time_window) + 'low-pass cutoff of %.2fs' % (cutoff),
            fontsize=20)
 
-mean_scores /= count
-print(mean_scores)
+print(all_scores)
 plt.show()

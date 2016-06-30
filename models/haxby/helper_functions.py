@@ -246,3 +246,21 @@ def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test, paradigm=None,
     score = metrics.r2_score(one_hot_test, prediction, multioutput='raw_values')
 
     return prediction, score
+
+
+def create_embedding(fmri, series, categories, n_sessions=12):
+    """
+    """
+
+    embedding = np.zeros((len(categories) - 1, 9*n_sessions, np.shape(fmri)[1]))
+    labels = []
+    for category in range(len(categories) - 1):
+        embed_times = [time for time in range(1, len(fmri))
+                       if series[time] == category + 1]
+        embedding[category] = fmri[embed_times]
+        labels.append([category] * n_sessions * 9)
+
+    embedding = np.vstack(embedding)
+    labels = np.asarray(labels).ravel()
+
+    return embedding, labels

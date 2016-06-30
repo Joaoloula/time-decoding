@@ -12,11 +12,11 @@ import numpy as np
 # PARAMETERS
 n_scans = 1452
 n_c = 5  # number of Cs to use in logistic regression CV
-n_subjects = 6
+n_subjects = 1
 plot_subject = 0  # ID of the subject to plot
-time_window = 8
+time_window = 1
 cutoff = 0
-delay = 3  # Correction of the fmri scans in relation to the stimuli
+delay = 0  # Correction of the fmri scans in relation to the stimuli
 model = 'ridge'  # 'ridge' for Ridge CV, 'log' for logistic regression CV
 
 # PREPROCESSING

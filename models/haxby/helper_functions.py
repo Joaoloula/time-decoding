@@ -7,8 +7,7 @@ import numpy as np
 
 
 def read_data(subject, haxby_dataset):
-    """
-    Generates data for a given haxby dataset subject.
+    """Generates data for a given haxby dataset subject.
 
     Parameters
     ----------
@@ -16,7 +15,7 @@ def read_data(subject, haxby_dataset):
     subject: int from 0 to 5
         id of the subject whose data should be retrieved
 
-    haxby_dataset: dictionary
+    haxby_dataset: dictionary,
         nilearn-generated dictionary containing filepaths for the dataset
 
     Returns
@@ -35,13 +34,14 @@ def read_data(subject, haxby_dataset):
         list of all the categories, in the order they are coded in series
     """
     # Read labels
-    labels = np.recfromcsv(haxby_dataset.session_target[subject], delimiter=" ")
+    labels = np.recfromcsv(
+        haxby_dataset.session_target[subject], delimiter=" ")
     sessions_id = labels['chunks']
     target = labels['labels']
     categories = np.unique(target)
     # Make 'rest' be the first category in the list
-    categories = np.roll(categories,
-                         len(categories) - np.where(categories == 'rest')[0])
+    categories = np.roll(
+        categories, len(categories) - np.where(categories == 'rest')[0])
 
     # Initialize series array
     n_scans = len(sessions_id)
@@ -173,8 +173,8 @@ def fit_log(fmri_train, fmri_test, series_train, series_test, n_c, n_jobs=2):
     return prediction, prediction_proba, accuracy
 
 
-def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test, paradigm=None,
-              cutoff=0, n_alpha=5):
+def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test,
+              paradigm=None, cutoff=0, n_alpha=5):
     """
     Fits a Ridge regression on the data, using cross validation to choose the
     value of alpha. Also applies a low-pass filter using a Discrete Cosine
@@ -235,7 +235,7 @@ def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test, paradigm=None,
         one_hot_train = one_hot_train - np.dot(correction, one_hot_train)
 
     # Create alphas
-    alphas = np.logspace(n_alpha/2, n_alpha - (n_alpha/2), num=n_alpha)
+    alphas = np.logspace(n_alpha / 2, n_alpha - (n_alpha / 2), num=n_alpha)
 
     # Fit and predict
     ridge = linear_model.RidgeCV(alphas=alphas)
@@ -243,16 +243,16 @@ def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test, paradigm=None,
     prediction = ridge.predict(fmri_test)
 
     # Score
-    score = metrics.r2_score(one_hot_test, prediction, multioutput='raw_values')
-
+    score = metrics.r2_score(
+        one_hot_test, prediction, multioutput='raw_values')
     return prediction, score
 
 
 def create_embedding(fmri, series, categories, n_sessions=12):
     """
     """
-
-    embedding = np.zeros((len(categories) - 1, 9*n_sessions, np.shape(fmri)[1]))
+    embedding = np.zeros(
+        (len(categories) - 1, 9 * n_sessions, np.shape(fmri)[1]))
     labels = []
     for category in range(len(categories) - 1):
         embed_times = [time for time in range(1, len(fmri))
@@ -262,5 +262,4 @@ def create_embedding(fmri, series, categories, n_sessions=12):
 
     embedding = np.vstack(embedding)
     labels = np.asarray(labels).ravel()
-
     return embedding, labels

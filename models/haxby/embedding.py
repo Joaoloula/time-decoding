@@ -1,5 +1,6 @@
 from sklearn.cross_validation import LeavePOut
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.linear_model import RidgeClassifierCV
 from nilearn import datasets
 import helper_functions as hf
 import matplotlib.pyplot as plt
@@ -32,12 +33,11 @@ for subject in range(n_subjects):
                                                      time_window=time_window,
                                                      delay=delay)
 
-    embedding, labels = hf.create_embedding(fmri, series, categories,
-                                            sessions_id)
+    embedding, labels = hf.create_embedding(fmri, series, categories)
 
     # Create custom mask
-    custom_mask = np.hstack((np.where(labels == 6), np.where(labels == 7),
-                             np.where(labels == 4), np.where(labels == 0)))
+    custom_mask = np.hstack((np.where(labels == 6), np.where(labels == 7)))
+    #                        np.where(labels == 4), np.where(labels == 0)))
     embedding = embedding[custom_mask]
     labels = labels[custom_mask]
     embedding = embedding.reshape(embedding.shape[1:])
@@ -53,9 +53,12 @@ for subject in range(n_subjects):
         labels_test = labels[test_index]
 
         # Model
-        knn = KNeighborsClassifier(n_neighbors=n_neighbors, n_jobs=2)
-        knn.fit(embedding_train, labels_train)
-        mean_score += knn.score(embedding_test, labels_test)
+        # knn = KNeighborsClassifier(n_neighbors=n_neighbors, n_jobs=2)
+        # knn.fit(embedding_train, labels_train)
+        # mean_score += knn.score(embedding_test, labels_test)
+        ridge = RidgeClassifierCV()
+        ridge.fit(embedding_train, labels_train)
+        mean_score += ridge.score(embedding_test, labels_test)
 
         count += 1
 

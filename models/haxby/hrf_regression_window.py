@@ -13,7 +13,7 @@ import numpy as np
 n_scans = 1452
 n_c = 5  # number of Cs to use in logistic regression CV
 n_subjects = 1
-plot_subject = 0  # ID of the subject to plot
+plot_subject = 99  # ID of the subject to plot
 time_window = 1
 cutoff = 0
 delay = 0  # Correction of the fmri scans in relation to the stimuli
@@ -76,6 +76,10 @@ for subject in range(n_subjects):
                 axes[x, y].set_title('Category {cat}, score {score:.2f}'
                                      .format(cat=categories[k], score=score[k]),
                                      fontsize=16)
+                axes[x, y].axes.get_xaxis().set_visible(False)
+                axes[x, y].axes.get_yaxis().set_visible(False)
+                axes[x, y].set_xlim([0, len(prediction)])
+                axes[x, y].set_ylim([-0.4, 1.2])
 
         all_scores[subject] = score
         break  # Only run one CV step per subject for fast prototyping
@@ -84,8 +88,10 @@ for subject in range(n_subjects):
 
 # Calculate and print the mean score
 f.suptitle('Predictions and scores of %s model for subject %d, '
-           % (model, plot_subject) + 'time window of %d scans '
-           % (time_window) + 'low-pass cutoff of %.2fs' % (cutoff),
+           % (model, plot_subject) +
+           'time window of %d scans '
+           % (time_window),
+           # 'low-pass cutoff of %.2fs' % (cutoff),
            fontsize=20)
 
 print(all_scores)

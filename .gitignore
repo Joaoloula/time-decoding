@@ -3,3 +3,4 @@
 *.pyc
 *.lprof
 models/mixed_gambles/
+models/vim2/

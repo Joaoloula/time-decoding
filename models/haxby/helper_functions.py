@@ -31,7 +31,7 @@ def read_data(subject, haxby_dataset):
     sessions_id: numpy array of shape [n_scans]
         identifications of the sessions each scan belongs to (12 in total)
 
-    categories: string list of length 9
+    categories: numpy array of shape [n_categories]
         list of all the categories, in the order they are coded in series
     """
     # Read labels
@@ -129,24 +129,26 @@ def apply_time_window(fmri, series, sessions_id, time_window=8, delay=3):
     Returns
     -------
 
-    fmri_window: numpy array of shape [n_scans - (time_window + delay),
-    n_voxels]
+    fmri_window: numpy array of shape [n_scans - time_window, n_voxels]
         data from the fmri sessions corrected for the time window and the delay
 
-    series_window: numpy array of shape [n_scans - (time_window + delay)]
+    series_window: numpy array of shape [n_scans - time_window]
         time series of the stimuli, coded as ints from 0 to 8, corrected for the
         time window and the delay
 
-    sessions_id_window: numpy array of shape [n_scans - (time_window + delay)]
+    sessions_id_window: numpy array of shape [n_scans - time_window]
         identifications of the sessions each scan belongs to (12 in total),
         corrected for the time window and the delay
     """
+    n_scans = np.shape(fmri)[0]
+    n_voxels = np.shape(fmri)[1]
+
     series_window = series[delay: -(time_window - delay)]
     sessions_id_window = sessions_id[delay: -(time_window - delay)]
     fmri_window = np.asarray([fmri[scan: scan + time_window]
-                              for scan in range(len(fmri) - time_window)])
-    fmri_window = fmri_window.reshape((np.shape(fmri_window)[0],
-                                       time_window * np.shape(fmri)[1]))
+                              for scan in range(n_scans - time_window)])
+    fmri_window = fmri_window.reshape((n_scans - time_window,
+                                       time_window * n_voxels))
 
     return fmri_window, series_window, sessions_id_window
 
@@ -189,10 +191,10 @@ def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test, paradigm=None,
     fmri_test: numpy array of shape [n_scans_train, n_voxels]
         test data from the fmri sessions
 
-    one_hot_train: numpy array of shape [n_scans]
+    one_hot_train: numpy array of shape [n_scans, n_categories]
         time series of the train stimuli with one-hot encoding
 
-    one_hot_test: numpy array of shape [n_scans]
+    one_hot_test: numpy array of shape [n_scans, n_categories]
         time series of the test stimuli with one-hot encoding
 
     paradigm: pandas DataFrame
@@ -250,6 +252,32 @@ def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test, paradigm=None,
 
 def create_embedding(fmri, series, categories, n_sessions=12):
     """
+    Creates an embedding of the points in the stimuli blocks using the
+    experiment data as input.
+
+    Parameters
+    ----------
+
+    fmri: numpy array of shape [n_scans_train, n_voxels]
+        data from the fmri sessions
+
+    series: numpy array of shape [n_scans]
+        time series of the train stimuli
+
+    categories: numpy array of shape[n_categories]
+        list of all the categories, in the order they are coded in series
+
+    Returns
+    -------
+
+    embedding: numpy array of shape [duration * n_sessions * n_categories,
+    n_voxels]
+        embedding of all the data in the stimuli blocks
+
+    labels: numpy array of shape[duration * n_sessions * n_categories]
+        labels identifying the categories of the stimuli
+        (int in range 0, len(categories) - 1, as the category 'rest is
+        eliminated')
     """
 
     embedding = np.zeros((len(categories) - 1, 9*n_sessions, np.shape(fmri)[1]))

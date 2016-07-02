@@ -1,7 +1,13 @@
-# Performs multinomial logistic regression on activation data created from the
-# Haxby dataset, using a custom time window
-# Accuracy: 0.89 with 8 categories
-# from hrf_estimation.savitzky_golay import savgol_filter
+"""
+Performs multinomial logistic regression on activation data created from the
+Haxby dataset, using a custom time window
+Accuracy: 0.89 with 8 categories
+from hrf_estimation.savitzky_golay import savgol_filter
+
+Author: Joao Loula
+"""
+print(__doc__)
+
 from sklearn.cross_validation import LeavePLabelOut
 from nilearn import datasets
 import helper_functions as hf
@@ -35,11 +41,11 @@ elif model == 'ridge':
 sns.set_style('darkgrid')
 f, axes = plt.subplots(3, 3)
 for subject in range(n_subjects):
-    fmri, series, sessions_id, categories = hf.read_data(subject, haxby_dataset)
+    fmri, series, sessions_id, categories = hf.read_data(
+        subject, haxby_dataset)
     # Apply time window and time correction
-    fmri, series, sessions_id = hf.apply_time_window(fmri, series, sessions_id,
-                                                     time_window=time_window,
-                                                     delay=delay)
+    fmri, series, sessions_id = hf.apply_time_window(
+        fmri, series, sessions_id, time_window=time_window, delay=delay)
 
     paradigm = hf.create_paradigm(series, categories, tr=2.5)
 
@@ -73,9 +79,9 @@ for subject in range(n_subjects):
                 x, y = k % 3, k / 3
                 axes[x, y].plot(one_hot_test[:, k])
                 axes[x, y].plot(prediction[:, k])
-                axes[x, y].set_title('Category {cat}, score {score:.2f}'
-                                     .format(cat=categories[k], score=score[k]),
-                                     fontsize=16)
+                axes[x, y].set_title(
+                    'Category {cat}, score {score:.2f}'
+                    .format(cat=categories[k], score=score[k]), fontsize=16)
                 axes[x, y].axes.get_xaxis().set_visible(False)
                 axes[x, y].axes.get_yaxis().set_visible(False)
                 axes[x, y].set_xlim([0, len(prediction)])

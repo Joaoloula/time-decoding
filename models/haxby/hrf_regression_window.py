@@ -9,6 +9,7 @@ Author: Joao Loula
 print(__doc__)
 
 from sklearn.cross_validation import LeavePLabelOut
+from sklearn.metrics import accuracy_score
 from nilearn import datasets
 import helper_functions as hf
 import matplotlib.pyplot as plt
@@ -18,12 +19,12 @@ import numpy as np
 # PARAMETERS
 n_scans = 1452
 n_c = 5  # number of Cs to use in logistic regression CV
-n_subjects = 1
+n_subjects = 6
 plot_subject = 99  # ID of the subject to plot
-time_window = 1
+time_window = 8
 cutoff = 0
-delay = 0  # Correction of the fmri scans in relation to the stimuli
-model = 'ridge'  # 'ridge' for Ridge CV, 'log' for logistic regression CV
+delay = 3  # Correction of the fmri scans in relation to the stimuli
+model = 'log'  # 'ridge' for Ridge CV, 'log' for logistic regression CV
 
 # PREPROCESSING
 # Import all subjects from the haxby dataset
@@ -38,7 +39,7 @@ elif model == 'ridge':
     all_scores = np.zeros((n_subjects, 9))
     softmax_scores = np.zeros((n_subjects, 9))
 
-sns.set_style('darkgrid')
+plt.style.use('ggplot')
 f, axes = plt.subplots(3, 3)
 for subject in range(n_subjects):
     fmri, series, sessions_id, categories = hf.read_data(
@@ -64,7 +65,9 @@ for subject in range(n_subjects):
 
         if model == 'log':
             prediction, prediction_proba, score = hf.fit_log(
-                fmri_train, fmri_test, series_train, series_test, n_c=4)
+                fmri_train, fmri_test, series_train, series_test, n_c=n_c)
+            mask = series_test != 0
+            score = accuracy_score(series_test[mask], prediction[mask])
 
         elif model == 'ridge':
             prediction, score = hf.fit_ridge(fmri_train, fmri_test,
@@ -81,7 +84,7 @@ for subject in range(n_subjects):
                 axes[x, y].plot(prediction[:, k])
                 axes[x, y].set_title(
                     'Category {cat}, score {score:.2f}'
-                    .format(cat=categories[k], score=score[k]), fontsize=16)
+                    .format(cat=categories[k], score=score[k]), fontsize=20)
                 axes[x, y].axes.get_xaxis().set_visible(False)
                 axes[x, y].axes.get_yaxis().set_visible(False)
                 axes[x, y].set_xlim([0, len(prediction)])
@@ -93,12 +96,12 @@ for subject in range(n_subjects):
     print('processing subject ' + str(subject))
 
 # Calculate and print the mean score
-f.suptitle('Predictions and scores of %s model for subject %d, '
+"""f.suptitle('Predictions and scores of %s model for subject %d, '
            % (model, plot_subject) +
            'time window of %d scans '
            % (time_window),
            # 'low-pass cutoff of %.2fs' % (cutoff),
-           fontsize=20)
+           fontsize=20)"""
 
 print(all_scores)
 plt.show()

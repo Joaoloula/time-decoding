@@ -1,21 +1,20 @@
 from sklearn.cross_validation import LeavePOut
-from sklearn.neighbors import KNeighborsClassifier
+from sklearn.decomposition import PCA
 from sklearn.linear_model import RidgeClassifierCV
 from nilearn import datasets
 import helper_functions as hf
 import matplotlib.pyplot as plt
-import seaborn as sns
 import numpy as np
 
 # PARAMETERS
 n_components = 2  # number of components to use in the PCA
 n_neighbors = 5
-n_subjects = 4
+n_subjects = 1
 plot_subject = 0  # ID of the subject to plot
 time_window = 8
 cutoff = 0
 delay = 3  # Correction of the fmri scans in relation to the stimuli
-plot = False
+plot = True
 
 # PREPROCESSING
 # Import all subjects from the haxby dataset
@@ -24,8 +23,7 @@ haxby_dataset = datasets.fetch_haxby(n_subjects=n_subjects)
 # Initialize mean score and score counter
 mean_score = 0.
 count = 0
-sns.set_style('darkgrid')
-sns.set_palette("husl", n_colors=8)
+plt.style.use('ggplot')
 for subject in range(n_subjects):
     fmri, series, sessions_id, categories = hf.read_data(subject, haxby_dataset)
     # Apply time window and time correction
@@ -62,10 +60,25 @@ for subject in range(n_subjects):
 
         count += 1
 
-        if count >= 100:
+        if count >= 1:
             break
 
-    """if plot:
+    if plot:
+        pca = PCA(n_components=2)
+        embedding = pca.fit_transform(embedding)
+        faces = embedding[np.where(labels == 6)]
+        houses = embedding[np.where(labels == 7)]
+        plt.scatter(faces[:, 0], faces[:, 1], marker="o", s=40,
+                    color=plt.rcParams['axes.color_cycle'][0])
+        plt.scatter(houses[:, 0], houses[:, 1], marker="o", s=40,
+                    color=plt.rcParams['axes.color_cycle'][1])
+
+        axes = plt.gca()
+        axes.axes.get_xaxis().set_visible(False)
+        axes.axes.get_yaxis().set_visible(False)
+
+        plt.show()
+    """
         handles = []
         for category in range(len(categories) - 1):
             handles.append(plt.plot(
@@ -78,5 +91,7 @@ for subject in range(n_subjects):
                   "time window of %d scans" % (time_window), fontsize=20)
     plt.show()
     """
+
+
 mean_score /= count
 print(mean_score)

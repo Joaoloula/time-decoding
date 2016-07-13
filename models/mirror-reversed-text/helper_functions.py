@@ -115,8 +115,19 @@ def uniform_masking(fmri_list, high_pass=0.01):
     return fmri_list_masked
 
 
+def create_kernel(length, time_window=3):
+    """ """
+    k_block = [[1./3, 1./3, 1./3], [-1, 1, 0], [0, 1, -1]]
+    k = np.kron(np.eye(length), k_block)
+
+    inv_k_block = np.linalg.pinv(k)
+    inv_k = np.kron(np.eye(length), inv_k_block)
+
+    return k, inv_k
+
+
 def fit_ridge_regression(fmri_train, fmri_test, labels_train, labels_test,
-                         alphas=[0.01, 0.1, 1, 10, 100], k=10000):
+                         alphas=[0.01, 0.1, 1, 10, 100], k=10000, kernel=None):
     """ """
     anova = SelectKBest(f_classif, k=k)
     ridge = linear_model.RidgeCV(alphas=alphas)
@@ -138,6 +149,13 @@ def fit_ridge_regression(fmri_train, fmri_test, labels_train, labels_test,
     for scan in range(len(new_labels_test)):
         new_labels_test[scan] = np.argmax(labels_test[scan])
 
+    if kernel is not None:
+        # Fit RKHS model
+        train_kernel, inv_train_kernel = create_kernel(fmri_train.shape[0])
+        test_kernel, inv_test_kernel = create_kernel(fmri_train.shape[0])
+        fmri_train = np.dot(fmri_train, inv_train_kernel)
+        fmri_test = np.dot(fmri_test, inv_test_kernel)
+
     new_fmri_train = anova.fit_transform(fmri_train, new_labels_train)
     new_fmri_test = anova.transform(fmri_test)
 
@@ -150,7 +168,7 @@ def fit_ridge_regression(fmri_train, fmri_test, labels_train, labels_test,
 
 
 def fit_ridge_classification(fmri_train, fmri_test, labels_train, labels_test,
-                         alphas=[0.01, 0.1, 1, 10, 100], k=10000):
+                             alphas=[0.01, 0.1, 1, 10, 100], k=10000):
     """ """
     anova = SelectKBest(f_classif, k=k)
     ridge = linear_model.RidgeClassifierCV(alphas=alphas)
@@ -183,7 +201,6 @@ def fit_ridge_classification(fmri_train, fmri_test, labels_train, labels_test,
     new_labels_test = new_labels_test[mask_test]
     prediction_no_rest = np.add(np.argmax(probas[:, 1:], axis=1), 1)[mask_test]
     norest_score = metrics.accuracy_score(new_labels_test, prediction_no_rest)
-    # r2_scores = metrics.r2_score(labels_test, probas, multioutput='raw_values')
 
     return prediction, score, norest_score
 

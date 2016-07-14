@@ -3,7 +3,7 @@ import helper_functions as hf
 
 # Parameters
 n_subjects = 1
-time_window = 2
+time_window = 3
 plot = True
 two_classes = True
 
@@ -24,8 +24,8 @@ for subject in range(n_subjects):
     fmri_test, stimuli_test = hf.apply_time_window(fmri_test, stimuli_test,
                                                    time_window=time_window)
 
-    prediction, scores = hf.fit_logistic_regression(fmri_train,
-        fmri_test, stimuli_train, stimuli_test, k=10000)
+    prediction, scores = hf.fit_ridge_regression(fmri_train,
+        fmri_test, stimuli_train, stimuli_test, k=10000, kernel=True)
     print(scores)
 
     if plot:

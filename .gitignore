@@ -2,6 +2,8 @@
 *.p
 *.pyc
 *.lprof
+*.pickle
+*.nii.gz
 models/mixed_gambles/
 models/vim2/
 old/

@@ -260,12 +260,21 @@ def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test,
     return prediction, score
 
 
-def _create_kernel(length, penalty=10, time_window=3):
+def _create_kernel(length, penalty=10., time_window=3):
     """ Creates a kernel matrix and its inverse for RKHS """
 
-    k_block = [[1./3, 1./3, 1./3],
-               [-penalty, penalty, 0],
-               [0, penalty, -penalty]]
+    if time_window == 3:
+        k_block = [[1./3, 1./3, 1./3],
+                   [-penalty, penalty, 0],
+                   [0, penalty, -penalty]]
+
+    elif time_window == 5:
+        k_block = [[1./5, 1./5, 1./5, 1./5, 1./5],
+                   [-penalty/2, 0, penalty/2, 0, 0],
+                   [0, -penalty, penalty, 0, 0],
+                   [0, 0, penalty, -penalty, 0],
+                   [0, 0, penalty/2, 0, -penalty/2]]
+
     k = np.kron(np.eye(length), k_block)
 
     inv_k_block = np.linalg.pinv(k_block)
@@ -276,7 +285,7 @@ def _create_kernel(length, penalty=10, time_window=3):
 
 def fit_ridge_kernel(fmri_train, fmri_test, one_hot_train, one_hot_test,
                      paradigm=None, cutoff=0, n_alpha=5, kernel=False,
-                     penalty=10):
+                     penalty=10, time_window=8):
     """
     Fits a Ridge regression on the data, using cross validation to choose the
     value of alpha. Also applies a low-pass filter using a Discrete Cosine
@@ -341,8 +350,9 @@ def fit_ridge_kernel(fmri_train, fmri_test, one_hot_train, one_hot_test,
 
     if kernel:
         # Fit RKHS model
-        n_voxels = len(fmri_train[0])/3
-        kernel, inv_kernel = _create_kernel(n_voxels, penalty=penalty)
+        n_voxels = len(fmri_train[0])/time_window
+        kernel, inv_kernel = _create_kernel(n_voxels, penalty=penalty,
+                                            time_window=time_window)
         fmri_train = np.dot(fmri_train, inv_kernel)
         fmri_test = np.dot(fmri_test, inv_kernel)
 

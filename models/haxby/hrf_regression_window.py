@@ -1,3 +1,10 @@
+from sklearn.cross_validation import LeavePLabelOut
+from sklearn.metrics import accuracy_score
+from nilearn import datasets
+import helper_functions as hf
+import matplotlib.pyplot as plt
+import numpy as np
+
 """
 Performs multinomial logistic regression on activation data created from the
 Haxby dataset, using a custom time window
@@ -8,22 +15,19 @@ Author: Joao Loula
 """
 print(__doc__)
 
-from sklearn.cross_validation import LeavePLabelOut
-from sklearn.metrics import accuracy_score
-from nilearn import datasets
-import helper_functions as hf
-import matplotlib.pyplot as plt
-import numpy as np
-
 # PARAMETERS
 n_scans = 1452
 n_c = 5  # number of Cs to use in logistic regression CV
 n_subjects = 6
 plot_subject = 0  # ID of the subject to plot
-time_window = 3
+time_window = 5
 cutoff = 0
-delay = 1  # Correction of the fmri scans in relation to the stimuli
+delay = 2  # Correction of the fmri scans in relation to the stimuli
 model = 'ridge'  # 'ridge' for Ridge CV, 'log' for logistic regression CV
+
+# RKHS parameters
+penalty = 2.
+kernel = False
 
 # PREPROCESSING
 # Import all subjects from the haxby dataset
@@ -41,8 +45,7 @@ elif model == 'ridge':
 plt.style.use('ggplot')
 f, axes = plt.subplots(3, 3)
 for subject in range(n_subjects):
-    fmri, series, sessions_id, categories = hf.read_data(
-        subject, haxby_dataset)
+    fmri, series, sessions_id, categories = hf.read_data(subject, haxby_dataset)
     # Apply time window and time correction
     fmri, series, sessions_id = hf.apply_time_window(
         fmri, series, sessions_id, time_window=time_window, delay=delay)
@@ -69,9 +72,10 @@ for subject in range(n_subjects):
             score = accuracy_score(series_test[mask], prediction[mask])
 
         elif model == 'ridge':
-            prediction, score = hf.fit_ridge_kernel(fmri_train, fmri_test,
-                one_hot_train, one_hot_test, paradigm=paradigm, cutoff=cutoff,
-                kernel=True, penalty=9)
+            prediction, score = hf.fit_ridge_kernel(
+                fmri_train, fmri_test, one_hot_train, one_hot_test,
+                paradigm=paradigm, cutoff=cutoff, kernel=kernel,
+                penalty=penalty, time_window=time_window)
 
         # PLOT
         if subject == plot_subject:

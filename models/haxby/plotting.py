@@ -6,7 +6,7 @@ import pandas as pd
 import pickle
 
 
-def plot_barchart():
+def time_window_barplot():
     """ """
     scores = pickle.load(open('time_window_accuracies.pickle', 'rb'))
     model = np.hstack((['time window of 1'] * 6, ['time window of 5'] * 6,
@@ -43,5 +43,26 @@ def plot_hrfs():
     ax = plt.gca()
     ax.axes.get_yaxis().set_visible(False)
     ax.tick_params(axis='x', labelsize=15)
+
+    plt.show()
+
+
+def penalties_barplot(scores, model):
+    """ """
+
+    subject_list = ['Subject ' + str(sub) for sub in range(1, 7)]
+    subject = np.hstack((subject_list * (len(scores) / 6)))
+
+    dict = {}
+    dict['scores'] = scores
+    dict['model'] = model
+    dict['subject'] = subject
+    data = pd.DataFrame(dict)
+
+    plt.style.use('ggplot')
+
+    sns.set_context('talk', font_scale=1.5)
+    ax = sns.barplot(x='model', y='scores', data=data)
+    ax.set_title('Scores for different penalty models')
 
     plt.show()

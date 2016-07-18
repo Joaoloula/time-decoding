@@ -7,7 +7,8 @@ import pickle
 
 
 def time_window_barplot():
-    """ """
+    """ Make a score barplot from tests on different time windows, using the
+    data saved to a pickle file """
     scores = pickle.load(open('time_window_accuracies.pickle', 'rb'))
     model = np.hstack((['time window of 1'] * 6, ['time window of 5'] * 6,
                        ['time window of 8'] * 6))
@@ -48,8 +49,8 @@ def plot_hrfs():
 
 
 def penalties_barplot(scores, model):
-    """ """
-
+    """ Make a barplot from tests with the same time window using different
+    penalties on the kernel """
     subject_list = ['Subject ' + str(sub) for sub in range(1, 7)]
     subject = np.hstack((subject_list * (len(scores) / 6)))
 

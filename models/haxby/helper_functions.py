@@ -1,5 +1,6 @@
 from nistats.design_matrix import make_design_matrix
 from nilearn.input_data import NiftiMasker
+from sklearn.kernel_ridge import KernelRidge
 from sklearn import linear_model
 from sklearn import metrics
 import pandas as pd
@@ -143,12 +144,21 @@ def apply_time_window(fmri, series, sessions_id, time_window=8, delay=3):
     n_scans = np.shape(fmri)[0]
     n_voxels = np.shape(fmri)[1]
 
-    series_window = series[delay: -(time_window - delay)]
-    sessions_id_window = sessions_id[delay: -(time_window - delay)]
+    if time_window - delay == 0:
+        series_window = series[delay:]
+        sessions_id_window = sessions_id[delay:]
+
+    else:
+        series_window = series[delay: -(time_window - delay)]
+        sessions_id_window = sessions_id[delay: -(time_window - delay)]
+
     fmri_window = np.asarray([fmri[scan: scan + time_window]
                               for scan in range(n_scans - time_window)])
+    # Reshape to create a vector for each time window, keeping the same voxels
+    # at different scans close together, ie. the time dimension varies faster
+    # than the spatial one in the vector
     fmri_window = fmri_window.reshape((n_scans - time_window,
-                                       time_window * n_voxels))
+                                       time_window * n_voxels), order='F')
 
     return fmri_window, series_window, sessions_id_window
 
@@ -237,7 +247,7 @@ def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test,
         one_hot_train = one_hot_train - np.dot(correction, one_hot_train)
 
     # Create alphas
-    alphas = np.logspace(n_alpha / 2, n_alpha - (n_alpha / 2), num=n_alpha)
+    alphas = np.logspace(- n_alpha / 2, n_alpha - (n_alpha / 2), num=n_alpha)
 
     # Fit and predict
     ridge = linear_model.RidgeCV(alphas=alphas)
@@ -247,6 +257,139 @@ def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test,
     # Score
     score = metrics.r2_score(
         one_hot_test, prediction, multioutput='raw_values')
+    return prediction, score
+
+
+def _create_kernel(length, penalty=10, time_window=3):
+    """ Creates a kernel matrix and its inverse for RKHS """
+
+    k_block = [[1./3, 1./3, 1./3],
+               [-penalty, penalty, 0],
+               [0, penalty, -penalty]]
+    k = np.kron(np.eye(length), k_block)
+
+    inv_k_block = np.linalg.pinv(k_block)
+    inv_k = np.kron(np.eye(length), inv_k_block)
+
+    return k, inv_k
+
+
+def fit_ridge_kernel(fmri_train, fmri_test, one_hot_train, one_hot_test,
+                     paradigm=None, cutoff=0, n_alpha=5, kernel=False,
+                     penalty=10):
+    """
+    Fits a Ridge regression on the data, using cross validation to choose the
+    value of alpha. Also applies a low-pass filter using a Discrete Cosine
+    Transform and regresses out confounds.
+
+    Parameters
+    ----------
+
+    fmri_train: numpy array of shape [n_scans_train, n_voxels]
+        train data from the fmri sessions
+
+    fmri_test: numpy array of shape [n_scans_train, n_voxels]
+        test data from the fmri sessions
+
+    one_hot_train: numpy array of shape [n_scans, n_categories]
+        time series of the train stimuli with one-hot encoding
+
+    one_hot_test: numpy array of shape [n_scans, n_categories]
+        time series of the test stimuli with one-hot encoding
+
+    paradigm: pandas DataFrame
+        experimental paradigm, as implemented in nistats. See 'create_paradigm'
+
+    cutoff: float
+        period (in seconds) of the cutoff for the low-pass filter.
+        Defaults to 0 (no filtering).
+
+    n_alpha: int
+        number of alphas to test (logarithmically distributed around 1).
+        Defaults to 5.
+
+    Returns
+    -------
+
+    prediction: numpy array of size [n_categories, n_test_scans]
+        model prediction for the test fmri data
+
+    score: numpy array of size [n_categories]
+        prediction r2 score for each category
+    """
+    # Create drifts for each session separately, then stack to obtain drifts
+    # for training and testing
+    if cutoff != 0:
+        session_drift = 1 * (make_design_matrix(2.5 * np.arange(0, 121),
+                                                hrf_model='fir',
+                                                drift_model='cosine',
+                                                period_cut=cutoff,
+                                                paradigm=paradigm
+                                                ).as_matrix()).tolist()
+
+        train_drift = np.asarray((session_drift * 10)[:len(fmri_train)])
+
+        # Correct fmri signal and one-hot matrices using the drifts
+        DDT_inv = np.linalg.pinv(np.dot(train_drift, train_drift.T))
+        correction = np.dot(np.dot(DDT_inv, train_drift), train_drift.T)
+
+        fmri_train = fmri_train - np.dot(correction, fmri_train)
+        one_hot_train = one_hot_train - np.dot(correction, one_hot_train)
+
+    # Create alphas
+    alphas = np.logspace(- n_alpha / 2, n_alpha - (n_alpha / 2), num=n_alpha)
+
+    if kernel:
+        # Fit RKHS model
+        n_voxels = len(fmri_train[0])/3
+        kernel, inv_kernel = _create_kernel(n_voxels, penalty=penalty)
+        fmri_train = np.dot(fmri_train, inv_kernel)
+        fmri_test = np.dot(fmri_test, inv_kernel)
+
+    # Fit and predict
+    ridge = linear_model.RidgeCV(alphas=alphas)
+    ridge.fit(fmri_train, one_hot_train)
+    prediction = ridge.predict(fmri_test)
+
+    # Score
+    score = metrics.r2_score(
+        one_hot_test, prediction, multioutput='raw_values')
+    return prediction, score
+
+
+def _callable_kernel(i, j, kernel):
+    """ """
+    return kernel[i][j]
+
+
+def fit_ridge_kernel2(fmri_train, fmri_test, one_hot_train, one_hot_test,
+                      paradigm=None, cutoff=.01, alpha=.1, kernel_size=577):
+    """ """
+    if cutoff != 0:
+        session_drift = 1 * (make_design_matrix(2.5 * np.arange(0, 121),
+                                                hrf_model='fir',
+                                                drift_model='cosine',
+                                                period_cut=cutoff,
+                                                paradigm=paradigm
+                                                ).as_matrix()).tolist()
+
+        train_drift = np.asarray((session_drift * 10)[:len(fmri_train)])
+
+        # Correct fmri signal and one-hot matrices using the drifts
+        DDT_inv = np.linalg.pinv(np.dot(train_drift, train_drift.T))
+        correction = np.dot(np.dot(DDT_inv, train_drift), train_drift.T)
+
+        fmri_train = fmri_train - np.dot(correction, fmri_train)
+        one_hot_train = one_hot_train - np.dot(correction, one_hot_train)
+
+    kernel = _create_kernel(len(fmri_train[0])/3)
+    krr = KernelRidge(alpha=alpha, kernel=_callable_kernel(),
+                      kernel_params={'kernel': kernel})
+    krr.fit(fmri_train, one_hot_train)
+    prediction = krr.fit(fmri_test)
+
+    score = metrics.r2_score(one_hot_test, prediction, multioutput='raw_values')
+
     return prediction, score
 
 

@@ -13,18 +13,17 @@ from sklearn.metrics import accuracy_score
 from nilearn import datasets
 import helper_functions as hf
 import matplotlib.pyplot as plt
-import seaborn as sns
 import numpy as np
 
 # PARAMETERS
 n_scans = 1452
 n_c = 5  # number of Cs to use in logistic regression CV
 n_subjects = 6
-plot_subject = 99  # ID of the subject to plot
-time_window = 8
+plot_subject = 0  # ID of the subject to plot
+time_window = 3
 cutoff = 0
-delay = 3  # Correction of the fmri scans in relation to the stimuli
-model = 'log'  # 'ridge' for Ridge CV, 'log' for logistic regression CV
+delay = 1  # Correction of the fmri scans in relation to the stimuli
+model = 'ridge'  # 'ridge' for Ridge CV, 'log' for logistic regression CV
 
 # PREPROCESSING
 # Import all subjects from the haxby dataset
@@ -70,10 +69,9 @@ for subject in range(n_subjects):
             score = accuracy_score(series_test[mask], prediction[mask])
 
         elif model == 'ridge':
-            prediction, score = hf.fit_ridge(fmri_train, fmri_test,
-                                             one_hot_train, one_hot_test,
-                                             paradigm=paradigm, cutoff=cutoff,
-                                             n_alpha=n_c)
+            prediction, score = hf.fit_ridge_kernel(fmri_train, fmri_test,
+                one_hot_train, one_hot_test, paradigm=paradigm, cutoff=cutoff,
+                kernel=True, penalty=9)
 
         # PLOT
         if subject == plot_subject:

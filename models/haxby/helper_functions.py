@@ -188,16 +188,23 @@ def _create_kernel(length, penalty=10., time_window=3):
     """ Creates a kernel matrix and its inverse for RKHS """
 
     if time_window == 3:
-        k_block = [[1./3, 1./3, 1./3],
-                   [-penalty, penalty, 0],
-                   [0, penalty, -penalty]]
+        sample_matrix = np.array([[1, 1, 1], [-1, 2, -1], [-1, 0, 1]])
+        k_block = sample_matrix * [[1./np.sqrt(3)],
+                                   [penalty * 1./np.sqrt(6)],
+                                   [1./np.sqrt(2)]]
 
     elif time_window == 5:
-        k_block = [[1./5, 1./5, 1./5, 1./5, 1./5],
-                   [-penalty/2, 0, penalty/2, 0, 0],
-                   [0, -penalty, penalty, 0, 0],
-                   [0, 0, penalty, -penalty, 0],
-                   [0, 0, penalty/2, 0, -penalty/2]]
+        sample_matrix = np.array([[1, 1, 1, 1, 1],
+                                  [-1, 1, 0, 0, 0],
+                                  [0, -1, 1, 0, 0],
+                                  [0, 0, -1, 1, 0],
+                                  [0, 0, 0, -1, 1]])
+        q, _ = np.linalg.qr(sample_matrix.T)
+        k_block = q.T * [[penalty],
+                         [penalty],
+                         [penalty],
+                         [penalty],
+                         [penalty]]
 
     k = np.kron(np.eye(length), k_block)
 

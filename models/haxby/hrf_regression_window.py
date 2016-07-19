@@ -26,8 +26,8 @@ delay = 2  # Correction of the fmri scans in relation to the stimuli
 model = 'ridge'  # 'ridge' for Ridge CV, 'log' for logistic regression CV
 
 # RKHS parameters
-penalty = 2.
-kernel = False
+penalty = 2
+kernel = True
 
 # PREPROCESSING
 # Import all subjects from the haxby dataset
@@ -72,7 +72,7 @@ for subject in range(n_subjects):
             score = accuracy_score(series_test[mask], prediction[mask])
 
         elif model == 'ridge':
-            prediction, score = hf.fit_ridge_kernel(
+            prediction, score = hf.fit_ridge(
                 fmri_train, fmri_test, one_hot_train, one_hot_test,
                 paradigm=paradigm, cutoff=cutoff, kernel=kernel,
                 penalty=penalty, time_window=time_window)

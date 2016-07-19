@@ -64,6 +64,7 @@ def penalties_barplot(scores, model):
 
     sns.set_context('talk', font_scale=1.5)
     ax = sns.barplot(x='model', y='scores', data=data)
-    ax.set_title('Scores for different penalty models')
+    ax.set_title('Scores for different penalty models using kernel ridge '
+                 'regression with a time window of 3')
 
     plt.show()

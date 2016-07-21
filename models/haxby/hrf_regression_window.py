@@ -20,16 +20,16 @@ n_scans = 1452
 n_c = 5  # number of Cs to use in logistic regression CV
 n_subjects = 6
 plot_subject = 99  # ID of the subject to plot
-time_window = 1
+time_window = 3
 cutoff = 0
-delay = 0  # Correction of the fmri scans in relation to the stimuli
+delay = 1  # Correction of the fmri scans in relation to the stimuli
 model = 'ridge'  # 'ridge' for Ridge CV, 'log' for logistic regression CV
 classify = True
 
 # RKHS parameters
 penalty = 1
 n_iterations = 1
-kernel = None
+kernel = 'voxel_weighing'
 
 # PREPROCESSING
 # Import all subjects from the haxby dataset
@@ -47,11 +47,8 @@ elif model == 'ridge':
 plt.style.use('ggplot')
 f, axes = plt.subplots(3, 3)
 for subject in range(n_subjects):
-    fmri, series, sessions_id, categories = hf.read_data(subject, haxby_dataset)
-    # Apply time window and time correction
-    fmri, series, sessions_id = hf.apply_time_window(
-        fmri, series, sessions_id, time_window=time_window, delay=delay)
-
+    fmri, series, sessions_id, categories = hf.read_data(subject, haxby_dataset,
+                                                         whole_brain=True)
     paradigm = hf.create_paradigm(series, categories, tr=2.5)
 
     # Initialize Leave P Label Out cross validation
@@ -64,12 +61,20 @@ for subject in range(n_subjects):
         fmri_train = fmri[train_index]
         fmri_test = fmri[test_index]
 
+        feature_selection = SelectPercentile(f_classif, percentile=10)
+        fmri_train = feature_selection.fit_transform(fmri_train, series_train)
+        fmri_test = feature_selection.transform(fmri_test)
+
+        # Apply time window and time correction
+        fmri_train, series_train, sessions_id = hf.apply_time_window(fmri_train,
+            series_train, sessions_id, time_window=time_window, delay=delay)
+
+        # Apply time window and time correction
+        fmri_test, series_test, sessions_id = hf.apply_time_window(fmri_test,
+            series_test, sessions_id, time_window=time_window, delay=delay)
+
         one_hot_train = hf.to_one_hot(series_train)
         one_hot_test = hf.to_one_hot(series_test)
-
-        feature_selection = SelectPercentile(f_classif, percentile=10)
-        fmri_train = feature_selection.fit_transform(fmri_train, one_hot_train)
-        fmri_test = feature_selection.transform(fmri_test)
 
         if model == 'log':
             prediction, prediction_proba, score = hf.fit_log(

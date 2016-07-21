@@ -9,7 +9,6 @@ import numpy as np
 Performs multinomial logistic regression on activation data created from the
 Haxby dataset, using a custom time window
 Accuracy: 0.89 with 8 categories
-from hrf_estimation.savitzky_golay import savgol_filter
 
 Author: Joao Loula
 """
@@ -20,14 +19,15 @@ n_scans = 1452
 n_c = 5  # number of Cs to use in logistic regression CV
 n_subjects = 6
 plot_subject = 0  # ID of the subject to plot
-time_window = 5
+time_window = 3
 cutoff = 0
-delay = 2  # Correction of the fmri scans in relation to the stimuli
-model = 'ridge'  # 'ridge' for Ridge CV, 'log' for logistic regression CV
+delay = 1  # Correction of the fmri scans in relation to the stimuli
+model = 'log'  # 'ridge' for Ridge CV, 'log' for logistic regression CV
 
 # RKHS parameters
-penalty = 2
-kernel = True
+penalty = 1
+n_iterations = 1
+kernel = 'voxel_weighing'
 
 # PREPROCESSING
 # Import all subjects from the haxby dataset
@@ -75,7 +75,8 @@ for subject in range(n_subjects):
             prediction, score = hf.fit_ridge(
                 fmri_train, fmri_test, one_hot_train, one_hot_test,
                 paradigm=paradigm, cutoff=cutoff, kernel=kernel,
-                penalty=penalty, time_window=time_window)
+                penalty=penalty, time_window=time_window,
+                n_iterations=n_iterations)
 
         # PLOT
         if subject == plot_subject:

@@ -51,7 +51,7 @@ def read_data(subject, haxby_dataset):
 
     # Read activity data
     # Standardize and detrend
-    mask_filename = haxby_dataset.mask_vt[subject]
+    mask_filename = haxby_dataset.mask
     nifti_masker = NiftiMasker(mask_img=mask_filename, standardize=True,
                                detrend=True, sessions=sessions_id)
     func_filename = haxby_dataset.func[subject]
@@ -184,7 +184,7 @@ def fit_log(fmri_train, fmri_test, series_train, series_test, n_c, n_jobs=2):
     return prediction, prediction_proba, accuracy
 
 
-def _create_kernel(length, penalty=10., time_window=3):
+def _create_time_smoothing_kernel(length, penalty=10., time_window=3):
     """ Creates a kernel matrix and its inverse for RKHS """
 
     if time_window == 3:
@@ -200,7 +200,7 @@ def _create_kernel(length, penalty=10., time_window=3):
                                   [0, 0, -1, 1, 0],
                                   [0, 0, 0, -1, 1]])
         q, _ = np.linalg.qr(sample_matrix.T)
-        k_block = q.T * [[penalty],
+        k_block = q.T * [[1. / (penalty ** 4)],
                          [penalty],
                          [penalty],
                          [penalty],
@@ -214,9 +214,27 @@ def _create_kernel(length, penalty=10., time_window=3):
     return k, inv_k
 
 
+def _create_voxel_weighing_kernel(betas, time_window):
+    """ Takes the beta coefficients learned by ridge regression and returns a
+    diagonal kernel with entries equal to the inverse of the each voxel's beta's
+    norm """
+    betas_norm = betas.reshape(-1, time_window, order='F')
+    betas_norm = np.repeat(np.linalg.norm(betas_norm, axis=1), time_window)
+    # Perform a prior normalization first to make sure no entries go to zero or
+    # infinity, and then normalize based on the product so that the kernel's
+    # determinant is equal to 1
+    betas_norm /= np.mean(betas_norm)  # Some prior form of normalization
+    betas_norm /= np.prod(betas_norm) ** (1./len(betas_norm))
+    kernel = np.diag(1. / betas_norm)
+    print(np.linalg.det(kernel))
+    inv_kernel = np.diag(betas_norm)
+
+    return kernel, inv_kernel
+
+
 def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test,
-              paradigm=None, cutoff=0, n_alpha=5, kernel=False,
-              penalty=10, time_window=8):
+              paradigm=None, cutoff=0, n_alpha=5, kernel=None,
+              penalty=10, time_window=8, n_iterations=1):
     """
     Fits a Ridge regression on the data, using cross validation to choose the
     value of alpha. Also applies a low-pass filter using a Discrete Cosine
@@ -248,8 +266,9 @@ def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test,
         number of alphas to test (logarithmically distributed around 1).
         Defaults to 5.
 
-    kernel: bool
-        whether or not to use a kernel
+    kernel: string or None
+        type of kernel to use: options are 'time_smoothing' and 'voxel_weighing'
+        Defaults to None (identity matrix).
 
     penalty: float
         the ratio to be used for penalization of the difference to the median
@@ -257,6 +276,10 @@ def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test,
 
     time_window: int
         the time window applied to the fmri data
+
+    n_iterations: int
+        number of regression iterations to perform for the 'voxel_weighing'
+        kernel
 
     Returns
     -------
@@ -286,21 +309,47 @@ def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test,
         fmri_train = fmri_train - np.dot(correction, fmri_train)
         one_hot_train = one_hot_train - np.dot(correction, one_hot_train)
 
-    # Create alphas
+    # Create alphas and initialize ridge estimator
     alphas = np.logspace(- n_alpha / 2, n_alpha - (n_alpha / 2), num=n_alpha)
+    ridge = linear_model.RidgeCV(alphas=alphas)
 
-    if kernel:
-        # Fit RKHS model
+    if kernel is None:
+        # Fit and predict
+        ridge.fit(fmri_train, one_hot_train)
+        prediction = ridge.predict(fmri_test)
+
+    if kernel == 'time_smoothing':
+        # Fit time-smoothing RKHS model
         n_voxels = len(fmri_train[0])/time_window
-        kernel, inv_kernel = _create_kernel(n_voxels, penalty=penalty,
-                                            time_window=time_window)
+        kernel, inv_kernel = _create_time_smoothing_kernel(
+            n_voxels, penalty=penalty, time_window=time_window)
         fmri_train = np.dot(fmri_train, inv_kernel)
         fmri_test = np.dot(fmri_test, inv_kernel)
+        # Fit and predict
+        ridge.fit(fmri_train, one_hot_train)
+        prediction = ridge.predict(fmri_test)
 
-    # Fit and predict
-    ridge = linear_model.RidgeCV(alphas=alphas)
-    ridge.fit(fmri_train, one_hot_train)
-    prediction = ridge.predict(fmri_test)
+    elif kernel == 'voxel_weighing':
+        ridge.fit(fmri_train, one_hot_train)
+        prediction = ridge.predict(fmri_test)
+        betas = ridge.coef_.T
+        for iteration in range(n_iterations):
+            new_betas = np.zeros_like(betas)
+            new_prediction = np.zeros_like(prediction)
+            # Perform a ridge regression to obtain the beta maps
+            for category in range(betas.shape[1]):
+                cat_betas = betas[:, category]
+                # Fit voxel-weighing RHKS model
+                kernel, inv_kernel = _create_voxel_weighing_kernel(
+                    cat_betas, time_window=time_window)
+                new_fmri_train = np.dot(fmri_train, inv_kernel)
+                new_fmri_test = np.dot(fmri_test, inv_kernel)
+                ridge.fit(new_fmri_train, one_hot_train[:, category])
+                new_prediction[:, category] = ridge.predict(new_fmri_test)
+                new_betas[:, category] = ridge.coef_.T
+
+            betas = new_betas
+            prediction = new_prediction
 
     # Score
     score = metrics.r2_score(

@@ -18,18 +18,18 @@ print(__doc__)
 # PARAMETERS
 n_scans = 1452
 n_c = 5  # number of Cs to use in logistic regression CV
-n_subjects = 6
+n_subjects = 1
 plot_subject = 99  # ID of the subject to plot
-time_window = 3
+time_window = 1
 cutoff = 0
-delay = 1  # Correction of the fmri scans in relation to the stimuli
+delay = 0  # Correction of the fmri scans in relation to the stimuli
 model = 'ridge'  # 'ridge' for Ridge CV, 'log' for logistic regression CV
-classify = True
+classify = False
 
 # RKHS parameters
 penalty = 1
 n_iterations = 1
-kernel = 'voxel_weighing'
+kernel = None
 
 # PREPROCESSING
 # Import all subjects from the haxby dataset

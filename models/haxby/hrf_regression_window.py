@@ -1,3 +1,4 @@
+from sklearn.feature_selection import SelectPercentile, f_classif
 from sklearn.cross_validation import LeavePLabelOut
 from sklearn.metrics import accuracy_score
 from nilearn import datasets
@@ -65,6 +66,10 @@ for subject in range(n_subjects):
 
         one_hot_train = hf.to_one_hot(series_train)
         one_hot_test = hf.to_one_hot(series_test)
+
+        feature_selection = SelectPercentile(f_classif, percentile=10)
+        fmri_train = feature_selection.fit_transform(fmri_train, one_hot_train)
+        fmri_test = feature_selection.transform(fmri_test)
 
         if model == 'log':
             prediction, prediction_proba, score = hf.fit_log(

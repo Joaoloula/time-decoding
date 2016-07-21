@@ -51,7 +51,7 @@ def read_data(subject, haxby_dataset):
 
     # Read activity data
     # Standardize and detrend
-    mask_filename = haxby_dataset.mask
+    mask_filename = haxby_dataset.mask_vt[subject]
     nifti_masker = NiftiMasker(mask_img=mask_filename, standardize=True,
                                detrend=True, sessions=sessions_id)
     func_filename = haxby_dataset.func[subject]
@@ -234,7 +234,7 @@ def _create_voxel_weighing_kernel(betas, time_window):
 
 def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test,
               paradigm=None, cutoff=0, n_alpha=5, kernel=None,
-              penalty=10, time_window=8, n_iterations=1):
+              penalty=10, time_window=8, n_iterations=1, classify=False):
     """
     Fits a Ridge regression on the data, using cross validation to choose the
     value of alpha. Also applies a low-pass filter using a Discrete Cosine
@@ -351,9 +351,19 @@ def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test,
             betas = new_betas
             prediction = new_prediction
 
+    if classify:
+        mask = np.logical_not(one_hot_test[:, 0])
+        class_regression, class_one_hot = prediction[mask], one_hot_test[mask]
+        class_prediction = np.zeros_like(class_regression)
+        for scan in range(class_regression.shape[0]):
+            class_prediction[scan][np.argmax(class_regression[scan])] = 1
+        class_score = metrics.accuracy_score(class_one_hot, class_prediction)
+        return prediction, class_score
+
     # Score
     score = metrics.r2_score(
         one_hot_test, prediction, multioutput='raw_values')
+
     return prediction, score
 
 

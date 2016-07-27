@@ -25,7 +25,7 @@ def _read_stimuli(stimuli_path, n_tasks=6, tr=2.4):
     session_stimuli_one = np.load(stimuli_path + '1.npy')
 
     classes = np.array(['rest', '01', '09', '12', '13', '14', '25'])
-    n_scans = n_tasks * 36 * 12  # TODO get actual number of scans
+    n_scans = 184 * n_tasks
     stimuli = np.zeros((n_scans, len(classes)))
     for task in range(n_tasks):
         for stimulus in range(len(session_stimuli_zero[task])):
@@ -33,21 +33,21 @@ def _read_stimuli(stimuli_path, n_tasks=6, tr=2.4):
                 classes == session_stimuli_zero[task][stimulus][:2])[0][0]
             one_class = np.where(
                 classes == session_stimuli_one[task][stimulus][:2])[0][0]
-            zero_index = float(round(((36*12*task) + (12*stimulus)) / tr))
-            one_index = float(round(((36*12*task) + (12*stimulus) + 4) / tr))
+            zero_index = int(round(((36*12*task) + (12*stimulus)) / tr))
+            one_index = int(round(((36*12*task) + (12*stimulus) + 4) / tr))
 
             # Add one_hot vector to respective locations
             stimuli[zero_index][zero_class] = 1
             stimuli[one_index][one_class] = 1
 
-    # Fill the rest with 'rest'
+    # Fill the rest with category 'rest' 
     rest_scans = np.where(np.sum(stimuli, axis=1) == 0)
     stimuli[rest_scans, 0] = 1
-
+   
     return stimuli
 
 
-def read_data(subject, n_runs=3, n_tasks=6, tr=2.4, n_scans=205,
+def read_data(subject, n_runs=2, n_tasks=6, tr=2.4, n_scans=205,
     path='/home/parietal/eickenbe/workspace/data/TextureAnalysis/'):
     """
     Reads data from the Texture dataset.
@@ -59,16 +59,16 @@ def read_data(subject, n_runs=3, n_tasks=6, tr=2.4, n_scans=205,
         subject from which to read the data
 
     n_runs: int from 1 to 3
-        number of runs to read from the subject, defaults to 3
+        number of runs to read from the subject, defaults to 2
 
-    n_runs: int from 1 to 6
+    n_tasks: int from 1 to 6
         number of tasks to read from the subject, defaults to 6
 
     tr: float
-        repetition time for the task (defaults to 1.5)
+        repetition time for the task (defaults to 2.4)
 
     n_scans: int
-        number of scans per run, defaults to 205
+        number of scans per run, defaults to 184
 
     Returns
     -------
@@ -83,7 +83,7 @@ def read_data(subject, n_runs=3, n_tasks=6, tr=2.4, n_scans=205,
     stimuli = [_read_stimuli(path+'stimuli/stim_seq')
                for session in range(n_runs)]
 
-    subject_list = ['ap100009', 'pb120360', 'pf120155', 'ns110383']
+    subject_list = ['pf120155', 'ns110383', 'ap100009', 'pb120360']
     sub = subject_list[subject]
     path += sub + '/'
     fmri = [_read_fmri(sub, run, path, task) for run in range(n_runs)
@@ -131,7 +131,7 @@ def apply_time_window(fmri, stimuli, time_window=8):
     return (fmri_window, stimuli_window)
 
 
-def uniform_masking(fmri_list, high_pass=0.01, smoothing=5):
+def uniform_masking(fmri_list, subject=0, high_pass=0.01, smoothing=5, n_runs=3, n_tasks=6):
     """ Mask all the sessions uniformly, doing standardization, linear
     detrending, DCT high_pas filtering and gaussian smoothing.
 
@@ -140,6 +140,10 @@ def uniform_masking(fmri_list, high_pass=0.01, smoothing=5):
 
     fmri_list: array-like
         array containing multiple BOLD data from different sessions
+
+    subject: int from 0 to 3
+        subject from which to read fmri data in case of opting to open pickle
+        file. Defaults to 0
 
     high_pass: float
         frequency at which to apply the high pass filter, defaults to 0.01
@@ -154,10 +158,16 @@ def uniform_masking(fmri_list, high_pass=0.01, smoothing=5):
         array containing the masked data
 
     """
+    # Initialize the masker
     masker = input_data.MultiNiftiMasker(mask_strategy='epi', standardize=True,
                                          detrend=True, high_pass=0.01, t_r=2.4,
                                          smoothing_fwhm=smoothing)
-    fmri_list_masked = masker.fit_transform(fmri_list)
+
+    # Fit the masker for each run independently
+    masker.fit(fmri_list[: n_tasks])
+    fmri_list_masked = np.vstack([
+        np.vstack(masker.transform(fmri_list[run * n_tasks: (run + 1) * n_tasks]))
+        for run in range(n_runs)])
 
     return fmri_list_masked
 

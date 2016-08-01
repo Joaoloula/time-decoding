@@ -43,12 +43,11 @@ def _read_stimuli(stimuli_path, n_tasks=6, tr=2.4):
     # Fill the rest with category 'rest'
     rest_scans = np.where(np.sum(stimuli, axis=1) == 0)
     stimuli[rest_scans, 0] = 1
-
     return stimuli
 
 
 def read_data(subject, n_runs=2, n_tasks=6, tr=2.4, n_scans=205,
-    path='/home/loula/Programming/python/neurospin/TextureAnalysis/'):
+    path='/home/parietal/eickenbe/workspace/data/TextureAnalysis/'):
     """
     Reads data from the Texture dataset.
 

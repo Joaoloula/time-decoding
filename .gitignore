@@ -4,6 +4,7 @@
 *.lprof
 *.pickle
 *.nii.gz
+*.npy
 models/mixed_gambles/
 models/vim2/
 old/

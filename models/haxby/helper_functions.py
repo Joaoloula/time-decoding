@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 
 
-def read_data(subject, haxby_dataset):
+def read_data(subject, haxby_dataset, whole_brain=False):
     """Generates data for a given haxby dataset subject.
 
     Parameters
@@ -51,7 +51,10 @@ def read_data(subject, haxby_dataset):
 
     # Read activity data
     # Standardize and detrend
-    mask_filename = haxby_dataset.mask_vt[subject]
+    if whole_brain:
+        mask_filename = haxby_dataset.mask
+    else:
+        mask_filename = haxby_dataset.mask_vt[subject]
     nifti_masker = NiftiMasker(mask_img=mask_filename, standardize=True,
                                detrend=True, sessions=sessions_id)
     func_filename = haxby_dataset.func[subject]

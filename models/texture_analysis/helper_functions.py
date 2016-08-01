@@ -8,72 +8,72 @@ import pandas as pd
 import numpy as np
 
 
-def _read_fmri(sub, run, path):
+def _read_fmri(sub, run, path, task):
     """ Reads BOLD signal data """
-    run = 'run-0' + str(run + 1)
-    task = 'task-livingnonlivingdecisionwithplainormirrorreversedtext'
-    fmri_path = (('{path}/ses-test/func/r{sub}_ses-test_{task}'
-                  '_{run}_bold.nii')
-                 .format(path=path, sub=sub, task=task, run=run))
+    run = sub + '_' + str(run + 1)
+    fmri_path = (('{path}{run}/fmri/cra{run}_td{task}.nii')
+                 .format(path=path, task=task+1, run=run))
     fmri = load_img(fmri_path)
 
     return fmri
 
 
-def _read_stimulus(sub, run, path, n_scans, tr, two_classes):
-    """ Reads stimulus data """
-    run = 'run-0' + str(run + 1)
-    task = 'task-livingnonlivingdecisionwithplainormirrorreversedtext'
-    onsets_path = (('{path}/ses-test/func/{sub}_ses-test_{task}'
-                    '_{run}_events.tsv')
-                   .format(path=path, sub=sub, task=task, run=run))
+def _read_stimuli(stimuli_path, n_tasks=6, tr=2.4):
+    """ Reads stimuli for the texture dataset and returns a numpy array of
+    shape [n_scans, n_classes] """
+    session_stimuli_zero = np.load(stimuli_path + '0.npy')
+    session_stimuli_one = np.load(stimuli_path + '1.npy')
 
-    paradigm = pd.read_csv(onsets_path, sep='\t')
-    onsets, durations, conditions = (paradigm['onset'], paradigm['duration'],
-                                     paradigm['trial_type'])
+    classes = np.array(['rest', '01', '09', '12', '13', '14', '25'])
+    n_scans = 184 * n_tasks
+    stimuli = np.zeros((n_scans, len(classes)))
+    for task in range(n_tasks):
+        for stimulus in range(len(session_stimuli_zero[task])):
+            zero_class = np.where(
+                classes == session_stimuli_zero[task][stimulus][:2])[0][0]
+            one_class = np.where(
+                classes == session_stimuli_one[task][stimulus][:2])[0][0]
+            zero_index = int(round(((36*12*task) + (12*stimulus)) / tr))
+            one_index = int(round(((36*12*task) + (12*stimulus) + 4) / tr))
 
-    cats = np.array(['rest', 'junk', 'pl_ns', 'pl_sw', 'mr_ns', 'mr_sw'])
-    stimuli = np.zeros((n_scans, len(cats)))
-    for index, condition in enumerate(conditions):
-        stim_onset = int(onsets.loc[index])/tr
-        stim_duration = 1 + int(durations.loc[index])/tr
-        (stimuli[stim_onset: stim_onset + stim_duration,
-                 np.where(cats == condition)[0][0]]) = 1
-    # Fill the rest with 'rest'
-    stimuli[np.logical_not(np.sum(stimuli, axis=1).astype(bool)), 0] = 1
+            # Add one_hot vector to respective locations
+            stimuli[zero_index][zero_class] = 1
+            stimuli[one_index][one_class] = 1
 
-    if two_classes:
-        stimuli = np.array([stimuli[:, 0] + stimuli[:, 1],
-                            stimuli[:, 2] + stimuli[:, 3],
-                            stimuli[:, 4] + stimuli[:, 5]]).T
+    # Fill the rest with category 'rest'
+    rest_scans = np.where(np.sum(stimuli, axis=1) == 0)
+    stimuli[rest_scans, 0] = 1
 
     return stimuli
 
 
-def read_data(subject, n_runs=6, tr=2, n_scans=205, two_classes=False,
-    path='/home/loula/Programming/python/neurospin/ds006_R2.0.0/results/'):
+def read_data(subject, n_runs=2, n_tasks=6, tr=2.4, n_scans=205,
+    path='/home/loula/Programming/python/neurospin/TextureAnalysis/'):
     """
-    Reads data from the Jimura dataset.
+    Reads data from the Texture dataset.
 
     Parameters
     ----------
 
-    subject: int from 0 to 13
+    subject: int from 0 to 3
         subject from which to read the data
 
-    n_runs: int from 1 to 6
-        number of runs to read from the subject, defaults to 6
+    n_runs: int from 1 to 3
+        number of runs to read from the subject, defaults to 2
+
+    n_tasks: int from 1 to 6
+        number of tasks to read from the subject, defaults to 6
 
     tr: float
-        repetition time for the task (defaults to 2)
+        repetition time for the task (defaults to 2.4)
 
     n_scans: int
-        number of scans per run, defaults to 205
+        number of scans per run, defaults to 184
 
-    two_classes: bool
-        whether to restrict stimuli to two classes (text vs. reversed text), or
-        to keep all the four original categories (which also include whether a
-        given stimulus is the same as the one that precedes it)
+    path: string
+        path in which the dataset is located. Defaults to local path, but can be
+        set to '/home/parietal/eickenbe/workspace/data/TextureAnalysis/' on
+        drago
 
     Returns
     -------
@@ -85,21 +85,19 @@ def read_data(subject, n_runs=6, tr=2, n_scans=205, two_classes=False,
         labels for the stimuli in one-hot encoding
 
     """
-    if subject < 9:
-        sub = 'sub-0' + str(subject + 1)
-    else:
-        sub = 'sub-' + str(subject + 1)
-    path += sub
+    stimuli = [_read_stimuli(path+'stimuli/stim_seq')
+               for session in range(n_runs)]
 
-    stimuli = [_read_stimulus(sub, run, path, n_scans, tr, two_classes)
-               for run in range(n_runs)]
-    fmri = [_read_fmri(sub, run, path) for run in range(n_runs)]
+    subject_list = ['pf120155', 'ns110383', 'ap100009', 'pb120360']
+    sub = subject_list[subject]
+    path += sub + '/'
+    fmri = [_read_fmri(sub, run, path, task) for run in range(n_runs)
+            for task in range(n_tasks)]
 
     return fmri, stimuli
 
 
-def apply_time_window(fmri_train, fmri_test, stimuli_train, stimuli_test,
-                      delay=3, time_window=8, k=10000):
+def apply_time_window(fmri, stimuli, time_window=8):
     """
     Applies a time window to a given experiment, extending the fmri to contain
     voxel activations of all scans in that window at each time step, and
@@ -128,31 +126,17 @@ def apply_time_window(fmri_train, fmri_test, stimuli_train, stimuli_test,
         labels for the stimuli, corrected for the time window
 
     """
-    # Apply the delay
-    fmri_train, fmri_test = fmri_train[delay:], fmri_test[delay:]
-    stimuli_train, stimuli_test = stimuli_train[:-delay], stimuli_test[:-delay]
+    n_scans, n_voxels = np.shape(fmri)
 
-    # Fit the anova feature selection
-    stimuli_train_1d = np.argmax(stimuli_train, axis=1)
-    anova = SelectKBest(f_classif, k=k)
-    fmri_train = anova.fit_transform(fmri_train, stimuli_train_1d)
-    fmri_test = anova.transform(fmri_test)
+    fmri_window = [fmri[scan: scan + time_window].ravel()
+                   for scan in xrange(n_scans - time_window)]
 
-    n_scans_train, n_scans_test = fmri_train.shape[0], fmri_test.shape[0]
+    stimuli_window = stimuli[: -time_window]
 
-    fmri_train_window = [fmri_train[scan: scan + time_window].ravel()
-                         for scan in xrange(n_scans_train - time_window)]
-    fmri_test_window = [fmri_test[scan: scan + time_window].ravel()
-                        for scan in xrange(n_scans_test - time_window)]
-
-    stimuli_train_window, stimuli_test_window = (stimuli_train[: -time_window],
-                                                 stimuli_test[: -time_window])
-
-    return (fmri_train_window, fmri_test_window, stimuli_train_window,
-            stimuli_test_window)
+    return (fmri_window, stimuli_window)
 
 
-def uniform_masking(fmri_list, high_pass=0.01, smoothing=5):
+def uniform_masking(fmri_list, subject=0, high_pass=0.01, smoothing=5, n_runs=3, n_tasks=6):
     """ Mask all the sessions uniformly, doing standardization, linear
     detrending, DCT high_pas filtering and gaussian smoothing.
 
@@ -161,6 +145,10 @@ def uniform_masking(fmri_list, high_pass=0.01, smoothing=5):
 
     fmri_list: array-like
         array containing multiple BOLD data from different sessions
+
+    subject: int from 0 to 3
+        subject from which to read fmri data in case of opting to open pickle
+        file. Defaults to 0
 
     high_pass: float
         frequency at which to apply the high pass filter, defaults to 0.01
@@ -175,19 +163,22 @@ def uniform_masking(fmri_list, high_pass=0.01, smoothing=5):
         array containing the masked data
 
     """
+    # Initialize the masker
     masker = input_data.MultiNiftiMasker(mask_strategy='epi', standardize=True,
-                                         detrend=True, high_pass=0.01, t_r=2,
+                                         detrend=True, high_pass=0.01, t_r=2.4,
                                          smoothing_fwhm=smoothing)
-    fmri_list_masked = masker.fit_transform(fmri_list)
+
+    # Fit the masker for each run independently
+    masker.fit(fmri_list[: n_tasks])
+    fmri_list_masked = np.vstack([
+        np.vstack(masker.transform(fmri_list[run * n_tasks: (run + 1) * n_tasks]))
+        for run in range(n_runs)])
 
     return fmri_list_masked
 
 
 def _create_time_smoothing_kernel(length, penalty=10., time_window=3):
     """ Creates a kernel matrix and its inverse for RKHS """
-
-    if time_window not in [3, 5]:
-        raise NotImplementedError
 
     if time_window == 3:
         sample_matrix = np.array([[1, 1, 1], [-1, 2, -1], [-1, 0, 1]])
@@ -226,16 +217,17 @@ def _create_voxel_weighing_kernel(betas, time_window):
     # infinity, and then normalize based on the product so that the kernel's
     # determinant is equal to 1
     betas_norm /= np.mean(betas_norm)  # Some prior form of normalization
-    betas_norm /= np.prod(betas_norm ** (1./len(betas_norm)))
-    kernel = 1. / betas_norm
-    inv_kernel = betas_norm
+    betas_norm /= np.prod(betas_norm) ** (1./len(betas_norm))
+    kernel = np.diag(1. / betas_norm)
+    print(np.linalg.det(kernel))
+    inv_kernel = np.diag(betas_norm)
 
     return kernel, inv_kernel
 
 
 def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test,
               n_alpha=5, kernel=None, penalty=10, time_window=3,
-              n_iterations=1, classify=False, k=10000):
+              n_iterations=1, classify=False):
     """
     Fits a Ridge regression on the data, using cross validation to choose the
     value of alpha. Also applies a low-pass filter using a Discrete Cosine
@@ -284,13 +276,9 @@ def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test,
     score: numpy array of size [n_categories]
         prediction r2 score for each category
     """
-
     # Create alphas and initialize ridge estimator
     alphas = np.logspace(- n_alpha / 2, n_alpha - (n_alpha / 2), num=n_alpha)
     ridge = linear_model.RidgeCV(alphas=alphas)
-
-    if kernel not in [None, 'time_smoothing', 'voxel_weighing']:
-        raise NotImplementedError
 
     if kernel is None:
         # Fit and predict
@@ -321,8 +309,8 @@ def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test,
                 # Fit voxel-weighing RHKS model
                 kernel, inv_kernel = _create_voxel_weighing_kernel(
                     cat_betas, time_window=time_window)
-                new_fmri_train = np.multiply(fmri_train, inv_kernel)
-                new_fmri_test = np.multiply(fmri_test, inv_kernel)
+                new_fmri_train = np.dot(fmri_train, inv_kernel)
+                new_fmri_test = np.dot(fmri_test, inv_kernel)
                 ridge.fit(new_fmri_train, one_hot_train[:, category])
                 new_prediction[:, category] = ridge.predict(new_fmri_test)
                 new_betas[:, category] = ridge.coef_.T
@@ -339,7 +327,7 @@ def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test,
         class_score = metrics.accuracy_score(class_one_hot, class_prediction)
         return prediction, class_score
 
-
+    # Score
     score = metrics.r2_score(
         one_hot_test, prediction, multioutput='raw_values')
 
@@ -399,47 +387,36 @@ def fit_logistic_regression(fmri_train, fmri_test, stimuli_train, stimuli_test,
     return probas, score
 
 
-def classification_score(prediction, stimuli):
+def classification_score(ridge_prediction, stimuli):
     """ Returns a classification score from a regressor by doing a softmax """
     # Restrain analysis to scans with stimuli (i.e. no 'rest' category)
-    mask = np.sum(stimuli[:, 1:], axis=1).astype(bool)
-    prediction, stimuli = np.array((prediction[mask], stimuli[mask]))
-    classifier = np.array([[0, 1, 0]
-                           if prediction[scan][1] > prediction[scan][2]
-                           else [0, 0, 1]
-                           for scan in range(prediction.shape[0])])
-    score = metrics.accuracy_score(stimuli, classifier)
+    mask = np.sum(stimuli, axis=1).astype(bool)
+    ridge_prediction, stimuli = ridge_prediction[mask], stimuli[mask]
+    ridge_classifier = np.zeros_like(ridge_prediction)
+    for scan in range(ridge_prediction.shape[0]):
+        ridge_classifier[scan][np.argmax(ridge_prediction[scan])] = 1
+    score = metrics.accuracy_score(stimuli, ridge_classifier)
 
     return score
 
 
-def plot(prediction, stimuli, scores, accuracy, delay=3, time_window=8,
-         two_classes=False, kernel=None, penalty=1):
+def plot(prediction, stimuli, scores, time_window=8, two_classes=False):
     """ Plots predictions and ground truths for each of the classes, as well
     as their r2 scores. """
     plt.style.use('ggplot')
     if two_classes:
         fig, axes = plt.subplots(2)
-
-        title = ('Ridge predictions for \'plain\' vs. \'reversed\', time window'
-                 'of {tw}, delay of {delay}. Accuracy: {acc:.2f}').format(
-                 tw=time_window, delay=delay, acc=accuracy)
-
-        if kernel == 'time_smoothing':
-            title += ' Kernel: time smoothing, penalty = {}'.format(penalty)
-
-        elif kernel == 'voxel_weighing':
-            title += ' Kernel: voxel weighing'
-
-        fig.suptitle(title, fontsize=20)
+        fig.suptitle(('Ridge predictions for \'plain\' vs. \'reversed\','
+                      'time window of {tw}')
+                     .format(tw=time_window), fontsize=20)
         axes[0].plot(stimuli[:, 0])
         axes[0].plot(prediction[:, 0])
-        axes[0].set_title(('Predictions for category \'plain\', r2 score of '
-                           '{score:.2f}').format(score=scores[0]), fontsize=18)
+        axes[0].set_title(('Predictions for category \'plain\', r2 score of'
+                           '{score}').format(score=scores[0]), fontsize=18)
         axes[1].plot(stimuli[:, 1])
         axes[1].plot(prediction[:, 1])
-        axes[1].set_title(('Predictions for category \'reversed\', r2 score of '
-                           '{score:.2f}').format(score=scores[1]), fontsize=18)
+        axes[1].set_title(('Predictions for category \'reversed\', r2 score of'
+                           '{score}').format(score=scores[1]), fontsize=18)
     else:
         cats = np.array(['junk', 'pl_ns', 'pl_sw', 'mr_ns', 'mr_sw'])
         fig, axes = plt.subplots(5)
@@ -449,8 +426,8 @@ def plot(prediction, stimuli, scores, accuracy, delay=3, time_window=8,
             axes[cat].plot(stimuli[:, cat])
             axes[cat].plot(prediction[:, cat])
             axes[cat].set_title(('Prediction for category {cat}, R2 score of '
-                                 '{score:.2f}').format(cat=cats[cat],
-                                                       score=scores[cat]),
+                                 '{score}').format(cat=cats[cat],
+                                                   score=scores[cat]),
                                 fontsize=18)
 
     plt.show()

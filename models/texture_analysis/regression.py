@@ -4,12 +4,12 @@ import numpy as np
 subject_names = ['pf120155']
 n_subjects = 1
 time_window = 3
-delay = 0
-k = 3000
+delay = 1
+k = 5000
 
 # Kernel parameters
-kernel = 'voxel_weighing'
-penalty = 1.
+kernel = None
+penalty = 'time_smoothing'
 
 for subject in range(n_subjects):
     fmri, stimuli = hf.read_data(subject)

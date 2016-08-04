@@ -3,6 +3,7 @@ from nilearn import input_data
 from sklearn import linear_model, metrics, manifold, decomposition
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.pipeline import Pipeline
+import hrf_estimation as he
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -17,27 +18,37 @@ def _read_fmri(sub, run, path, task):
     return fmri
 
 
-def _read_stimuli(stimuli_path, n_tasks=6, tr=2.4):
+def _read_stimuli(stimuli_path, stim_set, n_tasks=6, tr=2.4, glm=False):
     """ Reads stimuli for the texture dataset and returns a numpy array of
     shape [n_scans, n_classes] """
-    session_stimuli_zero = np.load(stimuli_path + '0.npy')
-    session_stimuli_one = np.load(stimuli_path + '1.npy')
+    if stim_set not in [1, 2]:
+        raise NotImplementedError
+    if stim_set == 1:
+        session_stimuli = np.load(stimuli_path + '1.npy').reshape(-1, 3)
+    elif stim_set == 2:
+        session_stimuli = np.load(stimuli_path + '2.npy').reshape(-1, 3)
 
-    classes = np.array(['rest', '01', '09', '12', '13', '14', '25'])
+    if glm:
+        return session_stimuli
+
+    classes = np.array(['rest', '01', '09', '12', '13', '14', '25', '0'])
     n_scans = 184 * n_tasks
     stimuli = np.zeros((n_scans, len(classes)))
-    for task in range(n_tasks):
-        for stimulus in range(len(session_stimuli_zero[task])):
-            zero_class = np.where(
-                classes == session_stimuli_zero[task][stimulus][:2])[0][0]
-            one_class = np.where(
-                classes == session_stimuli_one[task][stimulus][:2])[0][0]
-            zero_index = int(round(((36*12*task) + (12*stimulus)) / tr))
-            one_index = int(round(((36*12*task) + (12*stimulus) + 4) / tr))
+    for block in range(session_stimuli.shape[0]):
+        # Get classes from all three stimuli in the block
+        one_class = np.where(classes == session_stimuli[block][0][:2])[0][0]
+        two_class = np.where(classes == session_stimuli[block][1][:2])[0][0]
+        three_class = 7  # Task class always remains the same
 
-            # Add one_hot vector to respective locations
-            stimuli[zero_index][zero_class] = 1
-            stimuli[one_index][one_class] = 1
+        # Compute the scan index for each of the three stimuli
+        one_index = int(round((12 * block) / tr))
+        two_index = int(round(((12 * block) + 4) / tr))
+        three_index = int(round(((12 * block) + 8) / tr))
+
+        # Fill stimuli matrix with one-hot encoding
+        stimuli[one_index][one_class] = 1
+        stimuli[two_index][two_class] = 1
+        stimuli[three_index][three_class] = 1
 
     # Fill the rest with category 'rest'
     rest_scans = np.where(np.sum(stimuli, axis=1) == 0)
@@ -45,7 +56,7 @@ def _read_stimuli(stimuli_path, n_tasks=6, tr=2.4):
     return stimuli
 
 
-def read_data(subject, n_runs=2, n_tasks=6, tr=2.4, n_scans=205,
+def read_data(subject, n_runs=2, n_tasks=6, tr=2.4, n_scans=205, glm=False,
               path='/home/loula/Programming/python/neurospin/TextureAnalysis/'):
     """
     Reads data from the Texture dataset.
@@ -68,6 +79,9 @@ def read_data(subject, n_runs=2, n_tasks=6, tr=2.4, n_scans=205,
     n_scans: int
         number of scans per run, defaults to 184
 
+    glm: bool
+        whether to return data for use in a GLM model
+
     path: string
         path in which the dataset is located. Defaults to local path, but can be
         set to '/home/parietal/eickenbe/workspace/data/TextureAnalysis/' on
@@ -83,11 +97,19 @@ def read_data(subject, n_runs=2, n_tasks=6, tr=2.4, n_scans=205,
         labels for the stimuli in one-hot encoding
 
     """
-    stimuli = [_read_stimuli(path+'stimuli/stim_seq')
-               for session in range(n_runs)]
-
+    # Create list with subject ids and the set of stim for each of their runs
     subject_list = ['pf120155', 'ns110383', 'ap100009', 'pb120360']
+    stim_sets = {'pf120155': [1, 2],
+                 'ns110383': [1, 2],
+                 'ap100009': [1, 1, 2],
+                 'pb120360': [1, 1]}
+
     sub = subject_list[subject]
+
+    stimuli = [_read_stimuli(path+'stimuli/im_names_set', stim_sets[sub][run],
+                             glm=glm)
+               for run in range(n_runs)]
+
     path += sub + '/'
     fmri = [_read_fmri(sub, run, path, task) for run in range(n_runs)
             for task in range(n_tasks)]
@@ -418,13 +440,28 @@ def classification_score(prediction, stimuli):
     return score
 
 
+def glm(fmri, stimuli):
+    """ Fit a GLM for comparison with time decoding model """
+
+    tr = 2.4
+    conditions = stimuli.reshape(-1)
+    conditions = np.array([cond[:2] for cond in conditions])
+    n_trials = conditions.size
+    onsets = np.arange(0, 4 * n_trials, 4.)
+
+    hrfs, betas = he.glm(conditions, onsets, tr, fmri, basis='hrf',
+                         mode='r1glm')
+
+    return hrfs, betas
+
+
 def plot(prediction, stimuli, scores, accuracy, delay=3, time_window=8,
          kernel=None, penalty=1):
     """ Plots predictions and ground truths for each of the classes, as well
     as their r2 scores. """
     plt.style.use('ggplot')
     cats = np.array(['rest', 'bark', 'marble', 'gravel', 'wall', 'brick',
-                     'plaid'])
+                     'plaid', 'decision'])
     title = ('Ridge predictions for all classes, time window of {tw}, delay of '
              '{delay}. Accuracy: {acc:.2f}').format(
              tw=time_window, delay=delay, acc=accuracy)
@@ -435,9 +472,10 @@ def plot(prediction, stimuli, scores, accuracy, delay=3, time_window=8,
     elif kernel == 'voxel_weighing':
         title += ' Kernel: IRLS'
 
-    fig, axes = plt.subplots(7)
+    n_cats = len(cats)
+    fig, axes = plt.subplots(n_cats)
     fig.suptitle(title, fontsize=20)
-    for cat in range(len(cats)):
+    for cat in range(n_cats):
         axes[cat].plot(stimuli[:, cat])
         axes[cat].plot(prediction[:, cat])
         axes[cat].set_title(('Prediction for category {cat}, R2 score of '

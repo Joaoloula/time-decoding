@@ -4,6 +4,7 @@ from sklearn import linear_model, metrics, manifold, decomposition
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.pipeline import Pipeline
 import matplotlib.pyplot as plt
+import hrf_estimation as he
 import pandas as pd
 import numpy as np
 
@@ -20,7 +21,7 @@ def _read_fmri(sub, run, path):
     return fmri
 
 
-def _read_stimulus(sub, run, path, n_scans, tr, two_classes):
+def _read_stimulus(sub, run, path, n_scans, tr, two_classes, glm=False):
     """ Reads stimulus data """
     run = 'run-0' + str(run + 1)
     task = 'task-livingnonlivingdecisionwithplainormirrorreversedtext'
@@ -31,6 +32,8 @@ def _read_stimulus(sub, run, path, n_scans, tr, two_classes):
     paradigm = pd.read_csv(onsets_path, sep='\t')
     onsets, durations, conditions = (paradigm['onset'], paradigm['duration'],
                                      paradigm['trial_type'])
+    if glm:
+        return onsets, conditions
 
     cats = np.array(['rest', 'junk', 'pl_ns', 'pl_sw', 'mr_ns', 'mr_sw'])
     stimuli = np.zeros((n_scans, len(cats)))
@@ -51,7 +54,8 @@ def _read_stimulus(sub, run, path, n_scans, tr, two_classes):
 
 
 def read_data(subject, n_runs=6, tr=2, n_scans=205, two_classes=False,
-    path='/home/loula/Programming/python/neurospin/ds006_R2.0.0/results/'):
+    path='/home/loula/Programming/python/neurospin/ds006_R2.0.0/results/',
+    glm=False):
     """
     Reads data from the Jimura dataset.
 
@@ -91,8 +95,9 @@ def read_data(subject, n_runs=6, tr=2, n_scans=205, two_classes=False,
         sub = 'sub-' + str(subject + 1)
     path += sub
 
-    stimuli = [_read_stimulus(sub, run, path, n_scans, tr, two_classes)
+    stimuli = [_read_stimulus(sub, run, path, n_scans, tr, two_classes, glm)
                for run in range(n_runs)]
+
     fmri = [_read_fmri(sub, run, path) for run in range(n_runs)]
 
     return fmri, stimuli
@@ -129,8 +134,10 @@ def apply_time_window(fmri_train, fmri_test, stimuli_train, stimuli_test,
 
     """
     # Apply the delay
-    fmri_train, fmri_test = fmri_train[delay:], fmri_test[delay:]
-    stimuli_train, stimuli_test = stimuli_train[:-delay], stimuli_test[:-delay]
+    if delay != 0:
+        fmri_train, fmri_test = fmri_train[delay:], fmri_test[delay:]
+        stimuli_train, stimuli_test = (stimuli_train[:-delay],
+                                       stimuli_test[:-delay])
 
     # Fit the anova feature selection
     stimuli_train_1d = np.argmax(stimuli_train, axis=1)
@@ -411,6 +418,20 @@ def classification_score(prediction, stimuli):
     score = metrics.accuracy_score(stimuli, classifier)
 
     return score
+
+
+def glm(fmri, glm_stimuli, basis='hrf', mode='glm'):
+    """ Fit a GLM for comparison with time decoding model """
+    onsets = np.empty(64 * len(glm_stimuli))
+    conditions = np.empty(64 * len(glm_stimuli))
+    for run, stim in enumerate(glm_stimuli):
+        conditions[64 * run: 64 * (run + 1)] = stim[0] + (run * 410)
+        onsets[64 * run: 64 * (run + 1)] = stim[1]
+
+    tr = 2.
+    hrfs, betas = he.glm(conditions, onsets, tr, fmri, basis=basis, mode=mode)
+
+    return hrfs, betas
 
 
 def plot(prediction, stimuli, scores, accuracy, delay=3, time_window=8,

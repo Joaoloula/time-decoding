@@ -428,8 +428,9 @@ def fit_logistic_regression(fmri_train, fmri_test, stimuli_train, stimuli_test,
 def classification_score(prediction, stimuli):
     """ Returns a classification score from a regressor by doing a softmax """
     # Restrain analysis to scans with stimuli (i.e. no 'rest' category)
-    mask = np.sum(stimuli[:, 1:], axis=1).astype(bool)
-    prediction, stimuli = np.array((prediction[mask], stimuli[mask]))
+    mask = np.sum(stimuli[:, 1: -1], axis=1).astype(bool)
+    prediction = prediction[mask]
+    stimuli = stimuli[mask]
     classifier = np.zeros_like(stimuli)
     for scan in range(len(stimuli)):
         index = np.argmax(prediction[scan][1:])
@@ -440,17 +441,21 @@ def classification_score(prediction, stimuli):
     return score
 
 
-def glm(fmri, stimuli):
+def glm_scoring(prediction, stimuli):
+    """ Fits a logistic regression and scores it for a glm estimation """
+    log = linear_model.LogisticRegression()
+    mask = np.sum(stimuli[:, 1: -1], axis=1).astype(bool)
+    prediction = prediction[mask]
+
+def glm(fmri, stimuli, basis='hrf', mode='glm'):
     """ Fit a GLM for comparison with time decoding model """
 
     tr = 2.4
-    conditions = stimuli.reshape(-1)
-    conditions = np.array([cond[:2] for cond in conditions])
+    conditions = np.array([cond[:2] for cond in stimuli])
     n_trials = conditions.size
     onsets = np.arange(0, 4 * n_trials, 4.)
 
-    hrfs, betas = he.glm(conditions, onsets, tr, fmri, basis='hrf',
-                         mode='r1glm')
+    hrfs, betas = he.glm(conditions, onsets, tr, fmri, basis=basis, mode=mode)
 
     return hrfs, betas
 

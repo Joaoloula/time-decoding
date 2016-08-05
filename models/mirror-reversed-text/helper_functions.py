@@ -423,15 +423,26 @@ def classification_score(prediction, stimuli):
 def glm(fmri, glm_stimuli, basis='hrf', mode='glm'):
     """ Fit a GLM for comparison with time decoding model """
     onsets = np.empty(64 * len(glm_stimuli))
-    conditions = np.empty(64 * len(glm_stimuli))
+    conditions = np.empty(64 * len(glm_stimuli), dtype='str')
     for run, stim in enumerate(glm_stimuli):
-        conditions[64 * run: 64 * (run + 1)] = stim[0] + (run * 410)
-        onsets[64 * run: 64 * (run + 1)] = stim[1]
+        onsets[64 * run: 64 * (run + 1)] = stim[0] + (run * 410)
+        conditions[64 * run: 64 * (run + 1)] = stim[1]
 
     tr = 2.
     hrfs, betas = he.glm(conditions, onsets, tr, fmri, basis=basis, mode=mode)
 
     return hrfs, betas
+
+
+def glm_scoring(prediction, stimuli):
+    """ Fits a logistic regression and scores it for a glm estimation """
+    log = linear_model.LogisticRegression()
+    mask = np.sum(stimuli[:, 1: -1], axis=1).astype(bool)
+    prediction = prediction[mask]
+    # TODO
+    score = None
+
+    return score
 
 
 def plot(prediction, stimuli, scores, accuracy, delay=3, time_window=8,

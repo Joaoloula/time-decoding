@@ -23,8 +23,7 @@ for subject in subject_list:
     # Separate on train and test
     fmri_train, fmri_test = np.vstack(fmri_masked[:-1]), fmri_masked[-1]
     stimuli_train, stimuli_test = np.vstack(stimuli[:-1]), stimuli[-1]
-    glm_stimuli_train, glm_stimuli_test = (np.vstack(glm_stimuli[:-1]),
-                                           glm_stimuli[-1])
+    glm_stimuli_train, glm_stimuli_test = glm_stimuli[:-1], glm_stimuli[-1]
 
     # Apply time window
     fmri_train, fmri_test, stimuli_train, stimuli_test = hf.apply_time_window(

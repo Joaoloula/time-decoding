@@ -3,7 +3,7 @@ import helper_functions as hf
 import numpy as np
 
 # Parameters
-subject_list = range(1, 15)
+subject_list = range(1, 14)
 time_window = 1
 delay = 0
 k = 10000
@@ -30,7 +30,7 @@ for subject in subject_list:
         time_window=time_window, k=k)
 
     # Run the GLM
-    hrf, beta, labels, onsets = hf.glm(fmri, glm_stimuli, basis=basis,
+    hrf, beta, labels, onsets = hf.glm(fmri, glm_stimuli, runs, basis=basis,
                                        mode=mode)
 
     # Separate on train and test (leave one session out, no 'junk' class)

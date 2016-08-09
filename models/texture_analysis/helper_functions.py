@@ -29,7 +29,13 @@ def _read_stimuli(stimuli_path, stim_set, n_tasks=6, tr=2.4, glm=False):
         session_stimuli = np.load(stimuli_path + '2.npy').reshape(-1, 3)
 
     if glm:
-        return session_stimuli
+        session_stimuli = session_stimuli.ravel()
+        new_session_stimuli = []
+        for n, element in enumerate(session_stimuli):
+            new_session_stimuli.append(element)
+            if n % 2 == 0:
+                new_session_stimuli.append('0')
+        return new_session_stimuli
 
     classes = np.array(['rest', '01', '09', '12', '13', '14', '25', '0'])
     n_scans = 184 * n_tasks
@@ -454,13 +460,11 @@ def glm(fmri, stimuli, basis='hrf', mode='glm'):
     return hrfs, betas
 
 
-def glm_scoring(prediction, stimuli):
+def glm_scoring(betas_train, betas_test, labels_train, labels_test):
     """ Fits a logistic regression and scores it for a glm estimation """
     log = linear_model.LogisticRegression()
-    mask = np.sum(stimuli[:, 1: -1], axis=1).astype(bool)
-    prediction = prediction[mask]
-    # TODO
-    score = None
+    log.fit(betas_train, labels_train)
+    score = log.score(betas_test, labels_test)
 
     return score
 

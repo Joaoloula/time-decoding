@@ -1,3 +1,4 @@
+from nistats.design_matrix import make_design_matrix
 from nilearn.image import load_img
 from nilearn import input_data
 from sklearn import linear_model, metrics, manifold, decomposition
@@ -101,17 +102,21 @@ def read_data(subject, n_runs=6, tr=2, n_scans=205, two_classes=False,
     runs = []
     for run in range(n_runs):
         if glob.glob("*run-0" + str(run + 1) + "*"):
-            if glm:
-                runs += [run] * 64
-            else:
-                runs += [run] * n_scans
+            runs.append(run)
 
     stimuli = [_read_stimulus(sub, run, path, n_scans, tr, two_classes, glm)
-               for run in np.unique(runs)]
+               for run in runs]
 
-    fmri = [_read_fmri(sub, run, path) for run in np.unique(runs)]
+    fmri = [_read_fmri(sub, run, path) for run in runs]
 
-    return fmri, stimuli, runs
+    labels = []
+    for run_n in range(len(runs)):
+        if glm:
+            labels += [runs[run_n]] * len(stimuli[run_n][0])
+        else:
+            labels += [runs[run_n]] * n_scans
+
+    return fmri, stimuli, labels
 
 
 def apply_time_window(fmri_train, fmri_test, stimuli_train, stimuli_test,
@@ -419,7 +424,7 @@ def fit_logistic_regression(fmri_train, fmri_test, stimuli_train, stimuli_test,
 def classification_score(prediction, stimuli):
     """ Returns a classification score from a regressor by doing a softmax """
     # Restrain analysis to scans with stimuli (i.e. no 'rest' category)
-    mask = np.sum(stimuli[:, 1:], axis=1).astype(bool)
+    mask = np.sum(stimuli[:, 1: -1], axis=1).astype(bool)
     prediction, stimuli = np.array((prediction[mask], stimuli[mask]))
     classifier = np.array([[0, 1, 0]
                            if prediction[scan][1] > prediction[scan][2]
@@ -430,24 +435,38 @@ def classification_score(prediction, stimuli):
     return score
 
 
-def glm(fmri, glm_stimuli, basis='hrf', mode='glm'):
+def glm(fmri, glm_stimuli, labels, basis='hrf', mode='glm'):
     """ Fit a GLM for comparison with time decoding model """
-    onsets = np.empty(64 * len(glm_stimuli))
-    conditions = np.empty(64 * len(glm_stimuli), dtype='str')
+    onsets = np.empty(len(labels))
+    conditions = np.empty(len(labels), dtype='str')
+    start = 0
     for run, stim in enumerate(glm_stimuli):
-        onsets[64 * run: 64 * (run + 1)] = stim[0] + (run * 410)
-        conditions[64 * run: 64 * (run + 1)] = stim[1]
+        onsets[start: start + len(stim[0])] = stim[0] + (run * 410)
+        conditions[start: start + len(stim[0])] = stim[1]
+        start += len(stim[0])
 
     # Correction for problematic onsets
-    if onsets[-1] > len(fmri) * 2:
-        onsets[-1] = len(fmri) * 2
+    if onsets[-1] > (len(fmri) - 1) * 2:
+        onsets[-1] = (len(fmri) - 1) * 2
 
     tr = 2.
+    frame_times = np.arange(len(fmri) * tr)
     separate_conditions = xrange(len(conditions))
-    hrfs, betas = he.glm(separate_conditions, onsets, tr, fmri, basis=basis,
-                         mode=mode)
+    paradigm = {}
+    paradigm['onset'] = onsets
+    paradigm['name'] = separate_conditions
+    paradigm = pd.DataFrame(paradigm)
 
-    return hrfs, betas, conditions, onsets
+    X = make_design_matrix(frame_times, paradigm, hrf_model='spm')
+    """
+    X, hrf = he.create_design_matrix(
+            separate_conditions, onsets, tr, len(fmri), basis=basis,
+            oversample=1, hrf_length=20)
+    """
+    if mode == 'glm':
+        betas = np.dot(np.linalg.pinv(X[::2]), fmri)
+
+    return None, betas, conditions, onsets
 
 
 def glm_scoring(betas_train, betas_test, labels_train, labels_test):

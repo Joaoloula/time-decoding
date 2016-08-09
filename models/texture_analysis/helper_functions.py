@@ -30,12 +30,8 @@ def _read_stimuli(stimuli_path, stim_set, n_tasks=6, tr=2.4, glm=False):
 
     if glm:
         session_stimuli = session_stimuli.ravel()
-        new_session_stimuli = []
-        for n, element in enumerate(session_stimuli):
-            new_session_stimuli.append(element)
-            if n % 2 == 0:
-                new_session_stimuli.append('0')
-        return new_session_stimuli
+
+        return session_stimuli
 
     classes = np.array(['rest', '01', '09', '12', '13', '14', '25', '0'])
     n_scans = 184 * n_tasks
@@ -452,12 +448,14 @@ def glm(fmri, stimuli, basis='hrf', mode='glm'):
 
     tr = 2.4
     conditions = np.array([cond[:2] for cond in stimuli])
+    unique_conditions = range(len(conditions))
     n_trials = conditions.size
     onsets = np.arange(0, 4 * n_trials, 4.)
 
-    hrfs, betas = he.glm(conditions, onsets, tr, fmri, basis=basis, mode=mode)
+    hrfs, betas = he.glm(unique_conditions, onsets, tr, fmri, basis=basis,
+                         mode=mode)
 
-    return hrfs, betas
+    return hrfs, betas, conditions, onsets
 
 
 def glm_scoring(betas_train, betas_test, labels_train, labels_test):

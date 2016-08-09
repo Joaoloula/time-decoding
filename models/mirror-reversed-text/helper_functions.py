@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import hrf_estimation as he
 import pandas as pd
 import numpy as np
+import glob
+import os
 
 
 def _read_fmri(sub, run, path):
@@ -95,12 +97,21 @@ def read_data(subject, n_runs=6, tr=2, n_scans=205, two_classes=False,
         sub = 'sub-' + str(subject + 1)
     path += sub
 
+    os.chdir(path + "/ses-test/func/")
+    runs = []
+    for run in range(n_runs):
+        if glob.glob("*run-0" + str(run + 1) + "*"):
+            if glm:
+                runs += [run] * 64
+            else:
+                runs += [run] * n_scans
+
     stimuli = [_read_stimulus(sub, run, path, n_scans, tr, two_classes, glm)
-               for run in range(n_runs)]
+               for run in np.unique(runs)]
 
-    fmri = [_read_fmri(sub, run, path) for run in range(n_runs)]
+    fmri = [_read_fmri(sub, run, path) for run in np.unique(runs)]
 
-    return fmri, stimuli
+    return fmri, stimuli, runs
 
 
 def apply_time_window(fmri_train, fmri_test, stimuli_train, stimuli_test,
@@ -346,7 +357,6 @@ def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test,
         class_score = metrics.accuracy_score(class_one_hot, class_prediction)
         return prediction, class_score
 
-
     score = metrics.r2_score(
         one_hot_test, prediction, multioutput='raw_values')
 
@@ -428,19 +438,23 @@ def glm(fmri, glm_stimuli, basis='hrf', mode='glm'):
         onsets[64 * run: 64 * (run + 1)] = stim[0] + (run * 410)
         conditions[64 * run: 64 * (run + 1)] = stim[1]
 
+    # Correction for problematic onsets
+    if onsets[-1] > len(fmri) * 2:
+        onsets[-1] = len(fmri) * 2
+
     tr = 2.
-    hrfs, betas = he.glm(conditions, onsets, tr, fmri, basis=basis, mode=mode)
+    separate_conditions = xrange(len(conditions))
+    hrfs, betas = he.glm(separate_conditions, onsets, tr, fmri, basis=basis,
+                         mode=mode)
 
-    return hrfs, betas
+    return hrfs, betas, conditions, onsets
 
 
-def glm_scoring(prediction, stimuli):
+def glm_scoring(betas_train, betas_test, labels_train, labels_test):
     """ Fits a logistic regression and scores it for a glm estimation """
     log = linear_model.LogisticRegression()
-    mask = np.sum(stimuli[:, 1: -1], axis=1).astype(bool)
-    prediction = prediction[mask]
-    # TODO
-    score = None
+    log.fit(betas_train, labels_train)
+    score = log.score(betas_test, labels_test)
 
     return score
 

@@ -6,7 +6,7 @@ subject_names = ['pf120155']
 n_subjects = 1
 time_window = 1
 delay = 0
-k = 10000
+k = 5000
 
 # GLM Parameters
 basis = 'hrf'
@@ -18,12 +18,13 @@ for subject in range(n_subjects):
     _, glm_stimuli = hf.read_data(subject, glm=True)
     fmri = np.load(subject_names[subject] + '_fmri_masked.npy')
 
-    # Only get first run (TODO change this)
-    anova_stimuli = anova_stimuli[0]
-    glm_stimuli = glm_stimuli[0]
-    fmri = fmri[:fmri.shape[0] / 2]
+    # Only get first session (TODO change this)
+    anova_stimuli = anova_stimuli[1]
+    glm_stimuli = glm_stimuli[1]
+    fmri = fmri[fmri.shape[0] / 2:]
 
     # Apply time window
+
     fmri, _, anova_stimuli, __ = hf.apply_time_window(
         fmri, np.zeros_like(fmri), anova_stimuli, np.zeros_like(anova_stimuli),
         delay=delay, k=k, time_window=time_window)

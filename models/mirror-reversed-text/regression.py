@@ -3,9 +3,9 @@ import numpy as np
 import helper_functions as hf
 
 # Parameters
-subject_list = range(1, 14)
-time_window = 3
-delay = 1
+subject_list = [11]
+time_window = 1
+delay = 0
 k = 3000
 plot = False
 two_classes = True

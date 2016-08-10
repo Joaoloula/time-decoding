@@ -1,3 +1,4 @@
+from nistats.hemodynamic_models import glover_hrf
 from nistats.design_matrix import make_design_matrix
 from nilearn.image import load_img
 from nilearn import input_data
@@ -435,22 +436,34 @@ def classification_score(prediction, stimuli):
     return score
 
 
+def hrf_line(onset_scan, n_scans, hrf_length=32.):
+    """ Create a line for the convolution matrix used in the deconvolution
+    function"""
+    hrf = glover_hrf(tr=2., oversampling=1, onset=0, time_length=hrf_length)
+    hrf_size = len(hrf) - 1
+    padding = n_scans - onset_scan - hrf_size
+    if padding >= 0:
+        line = np.concatenate((np.zeros(onset_scan), hrf[1:],
+                               np.zeros(padding)))
+
+    else:
+        line = np.concatenate((np.zeros(onset_scan), hrf[1: padding]))
+
+    return line
+
+
 def deconvolution(reg_estimation, hrf_model='glover'):
     """ Deconvolve an estimation obtained by regression by solving a Ridge
     regularization problem with a convolution matrix created by stacking time-
     lagged HRFs """
-    tr = 2.
-    n_scans, n_classes = ridge_estimation.shape
-    time_length = n_scans * tr
+    n_scans, n_classes = reg_estimation.shape
     if hrf_model == 'glover':
-        conv_matrix = [glover_hrf(tr, oversampling=1, onset=scan*tr, 
-                                  time_length = time_length)
-                       for scan in len(n_scans)]
+        conv_matrix = [hrf_line(scan, n_scans) for scan in range(n_scans)]
     ridge = linear_model.RidgeCV()
-    ridge.fit(conv_matrix, reg_estimation)
+    ridge.fit(np.array(conv_matrix).T, reg_estimation)
     deconvolved_estimation = ridge.coef_
 
-    return ridge.coef_
+    return deconvolved_estimation
 
 
 def glm(fmri, glm_stimuli, labels, basis='hrf', mode='glm'):

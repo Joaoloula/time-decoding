@@ -435,6 +435,24 @@ def classification_score(prediction, stimuli):
     return score
 
 
+def deconvolution(reg_estimation, hrf_model='glover'):
+    """ Deconvolve an estimation obtained by regression by solving a Ridge
+    regularization problem with a convolution matrix created by stacking time-
+    lagged HRFs """
+    tr = 2.
+    n_scans, n_classes = ridge_estimation.shape
+    time_length = n_scans * tr
+    if hrf_model == 'glover':
+        conv_matrix = [glover_hrf(tr, oversampling=1, onset=scan*tr, 
+                                  time_length = time_length)
+                       for scan in len(n_scans)]
+    ridge = linear_model.RidgeCV()
+    ridge.fit(conv_matrix, reg_estimation)
+    deconvolved_estimation = ridge.coef_
+
+    return ridge.coef_
+
+
 def glm(fmri, glm_stimuli, labels, basis='hrf', mode='glm'):
     """ Fit a GLM for comparison with time decoding model """
     onsets = np.empty(len(labels))

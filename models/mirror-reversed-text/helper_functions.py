@@ -50,9 +50,10 @@ def _read_stimulus(sub, run, path, n_scans, tr, two_classes, glm=False):
     stimuli[np.logical_not(np.sum(stimuli, axis=1).astype(bool)), 0] = 1
 
     if two_classes:
-        stimuli = np.array([stimuli[:, 0] + stimuli[:, 1],
+        stimuli = np.array([stimuli[:, 0],
                             stimuli[:, 2] + stimuli[:, 3],
-                            stimuli[:, 4] + stimuli[:, 5]]).T
+                            stimuli[:, 4] + stimuli[:, 5],
+                            stimuli[:, 1]]).T
 
     return stimuli
 
@@ -164,16 +165,16 @@ def apply_time_window(fmri_train, fmri_test, stimuli_train, stimuli_test,
 
     n_scans_train, n_scans_test = fmri_train.shape[0], fmri_test.shape[0]
 
-    fmri_train_window = [fmri_train[scan: scan + time_window].ravel()
-                         for scan in xrange(n_scans_train - time_window)]
-    fmri_test_window = [fmri_test[scan: scan + time_window].ravel()
-                        for scan in xrange(n_scans_test - time_window)]
+    fmri_train = [fmri_train[scan: scan + time_window].ravel()
+                  for scan in xrange(n_scans_train - time_window + 1)]
+    fmri_test = [fmri_test[scan: scan + time_window].ravel()
+                 for scan in xrange(n_scans_test - time_window + 1)]
 
-    stimuli_train_window, stimuli_test_window = (stimuli_train[: -time_window],
-                                                 stimuli_test[: -time_window])
+    if time_window != 1:
+        stimuli_train, stimuli_test = (stimuli_train[: -(time_window - 1)],
+                                       stimuli_test[: -(time_window - 1)])
 
-    return (fmri_train_window, fmri_test_window, stimuli_train_window,
-            stimuli_test_window)
+    return fmri_train, fmri_test, stimuli_train, stimuli_test
 
 
 def uniform_masking(fmri_list, high_pass=0.01, smoothing=5):
@@ -259,7 +260,8 @@ def _create_voxel_weighing_kernel(betas, time_window):
 
 def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test,
               n_alpha=5, kernel=None, penalty=10, time_window=3,
-              n_iterations=1, classify=False, k=10000):
+              n_iterations=1, classify=False, k=10000, double_prediction=False,
+              extra=None):
     """
     Fits a Ridge regression on the data, using cross validation to choose the
     value of alpha. Also applies a low-pass filter using a Discrete Cosine
@@ -271,13 +273,13 @@ def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test,
     fmri_train: numpy array of shape [n_scans_train, n_voxels]
         train data from the fmri sessions
 
-    fmri_test: numpy array of shape [n_scans_train, n_voxels]
+    fmri_test: numpy array of shape [n_scans_test, n_voxels]
         test data from the fmri sessions
 
-    one_hot_train: numpy array of shape [n_scans, n_categories]
+    one_hot_train: numpy array of shape [n_scans_train, n_categories]
         time series of the train stimuli with one-hot encoding
 
-    one_hot_test: numpy array of shape [n_scans, n_categories]
+    one_hot_test: numpy array of shape [n_scans_test, n_categories]
         time series of the test stimuli with one-hot encoding
 
     n_alpha: int
@@ -298,6 +300,12 @@ def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test,
     n_iterations: int
         number of regression iterations to perform for the 'voxel_weighing'
         kernel
+
+    double_prediction: bool
+        whether to make a prediction for an extra input as well
+
+    extra: numpy array of shape [n_scans_test, n_voxels]
+        extra input to be predicted if double prediction is True
 
     Returns
     -------
@@ -366,6 +374,11 @@ def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test,
     score = metrics.r2_score(
         one_hot_test, prediction, multioutput='raw_values')
 
+    if double_prediction:
+        extra_prediction = ridge.predict(extra)
+
+        return prediction, extra_prediction, score
+
     return prediction, score
 
 
@@ -422,15 +435,25 @@ def fit_logistic_regression(fmri_train, fmri_test, stimuli_train, stimuli_test,
     return probas, score
 
 
-def classification_score(prediction, stimuli):
+def classification_score(prediction, stimuli, mode='regression'):
     """ Returns a classification score from a regressor by doing a softmax """
     # Restrain analysis to scans with stimuli (i.e. no 'rest' category)
-    mask = np.sum(stimuli[:, 1: -1], axis=1).astype(bool)
-    prediction, stimuli = np.array((prediction[mask], stimuli[mask]))
-    classifier = np.array([[0, 1, 0]
-                           if prediction[scan][1] > prediction[scan][2]
-                           else [0, 0, 1]
+    if mode == 'regression':
+        mask = np.sum(stimuli[:, 1: -1], axis=1).astype(bool)
+        prediction, stimuli = np.array((prediction[mask][:, 1: -1],
+                                        stimuli[mask][:, 1: -1]))
+
+    elif mode == 'glm':
+         mask = np.sum(stimuli[:, 1: -1], axis=1).astype(bool)
+         # Flip prediction to correspond to stimuli
+         prediction, stimuli = np.array((np.fliplr(prediction[mask][:, 1:]),
+                                        stimuli[mask][:, 1: -1]))
+
+    classifier = np.array([[1, 0]
+                           if prediction[scan][0] > prediction[scan][1]
+                           else [0, 1]
                            for scan in range(prediction.shape[0])])
+
     score = metrics.accuracy_score(stimuli, classifier)
 
     return score
@@ -439,17 +462,27 @@ def classification_score(prediction, stimuli):
 def hrf_line(onset_scan, n_scans, hrf_length=32.):
     """ Create a line for the convolution matrix used in the deconvolution
     function"""
-    hrf = glover_hrf(tr=2., oversampling=1, onset=0, time_length=hrf_length)
-    hrf_size = len(hrf) - 1
+    hrf = he.hrf.spmt(np.linspace(0, hrf_length, (hrf_length // 2.)))
+    # hrf = glover_hrf(tr=2., oversampling=1, onset=0, time_length=hrf_length)
+    hrf_size = len(hrf)
     padding = n_scans - onset_scan - hrf_size
     if padding >= 0:
-        line = np.concatenate((np.zeros(onset_scan), hrf[1:],
-                               np.zeros(padding)))
+        line = np.concatenate((np.zeros(onset_scan), hrf, np.zeros(padding)))
 
     else:
-        line = np.concatenate((np.zeros(onset_scan), hrf[1: padding]))
+        line = np.concatenate((np.zeros(onset_scan), hrf[: padding]))
 
     return line
+
+
+def convolve_events(conditions, onsets, n_scans, basis='hrf'):
+    """ Creates a design matrix with the events convolved with an hrf specified
+    by the 'basis' argument """
+    X, _ = he.create_design_matrix(conditions, onsets, TR=2.,
+                                   n_scans=n_scans, basis=basis,
+                                   oversample=1, hrf_length=32)
+
+    return X
 
 
 def deconvolution(reg_estimation, hrf_model='glover'):
@@ -464,6 +497,23 @@ def deconvolution(reg_estimation, hrf_model='glover'):
     deconvolved_estimation = ridge.coef_
 
     return deconvolved_estimation
+
+
+def logistic_deconvolution(estimation_train, estimation_test, stimuli_train,
+                           stimuli_test, logistic_window):
+    """ Learn a deconvolution filter for classification given a time window
+    using logistic regression """
+    log = linear_model.LogisticRegressionCV()
+    cats_train = [
+        estimation_train[scan: scan + logistic_window].ravel()
+        for scan in xrange(len(estimation_train) - logistic_window + 1)]
+    cats_test = [
+        estimation_test[scan: scan + logistic_window].ravel()
+        for scan in xrange(len(estimation_test) - logistic_window + 1)]
+    log.fit(cats_train, stimuli_train)
+    accuracy = log.score(cats_test, stimuli_test)
+
+    return accuracy
 
 
 def glm(fmri, glm_stimuli, labels, basis='hrf', mode='glm'):

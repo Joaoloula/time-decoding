@@ -3,7 +3,7 @@ import helper_functions as hf
 import numpy as np
 
 # Parameters
-subject_list = range(1, 14)
+subject_list = [11]
 time_window = 1
 delay = 0
 k = 10000

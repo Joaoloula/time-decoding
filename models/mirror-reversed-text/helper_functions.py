@@ -510,6 +510,18 @@ def logistic_deconvolution(estimation_train, estimation_test, stimuli_train,
     cats_test = [
         estimation_test[scan: scan + logistic_window].ravel()
         for scan in xrange(len(estimation_test) - logistic_window + 1)]
+
+    train_mask = np.sum(
+        stimuli_train[:len(cats_train), 1: -1], axis=1).astype(bool)
+    test_mask = np.sum(
+        stimuli_test[:len(cats_test), 1: -1], axis=1).astype(bool)
+
+    stimuli_train, stimuli_test = (
+        np.argmax(stimuli_train[:len(cats_train)][train_mask], axis=1),
+        np.argmax(stimuli_test[:len(cats_test)][test_mask], axis=1))
+    cats_train, cats_test = (
+        np.array(cats_train)[train_mask], np.array(cats_test)[test_mask])
+
     log.fit(cats_train, stimuli_train)
     accuracy = log.score(cats_test, stimuli_test)
 

@@ -4,9 +4,9 @@ import helper_functions as hf
 
 # Parameters
 subject_list = [11]
-time_window = 1
-delay = 0
-k = 3000
+time_window = 3
+delay = 2
+k = 10000
 plot = False
 two_classes = True
 

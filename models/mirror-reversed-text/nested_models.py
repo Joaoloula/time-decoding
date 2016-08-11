@@ -13,7 +13,7 @@ plot = True
 # GLM parameters
 basis = 'hrf'
 mode = 'glm'
-logistic_window = 3
+logistic_window = 5
 
 subject_scores = []
 for subject in subject_list:

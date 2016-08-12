@@ -3,7 +3,7 @@ import helper_functions as hf
 import numpy as np
 
 # Parameters
-subject_list = [11]
+subject_list = range(14)
 time_window = 1
 delay = 0
 k = 10000
@@ -11,9 +11,9 @@ two_classes = True
 plot = True
 
 # GLM parameters
-basis = 'hrf'
+basis = '3hrf'
 mode = 'glm'
-logistic_window = 5
+logistic_window = 4
 
 subject_scores = []
 for subject in subject_list:
@@ -41,6 +41,7 @@ for subject in subject_list:
 
     lplo = LeavePLabelOut(runs, p=1)
     runs = np.array(runs)
+    """
     first_train = np.where(np.logical_or(runs == 0, runs == 1))[0]
     second_train = np.where(np.logical_or(runs == 2, runs == 3))[0]
     second_test = np.where(np.logical_or(runs == 4, runs == 5))[0]
@@ -49,10 +50,17 @@ for subject in subject_list:
     fmri_second_test = fmri[second_test]
     design_train, design_test = design[first_train], design[second_train]
     stimuli_train, stimuli_test = stimuli[second_train], stimuli[second_test]
+    """
+    train = np.where(runs <= 4)[0]
+    test = np.where(runs > 4)[0]
 
-    prediction_train, prediction_test, scores = hf.fit_ridge(
+    fmri_train, fmri_test = fmri[train], fmri[test]
+    design_train, design_test = design[train], design[test]
+    stimuli_train, stimuli_test = stimuli[train], stimuli[test]
+
+    prediction_test, prediction_train, scores = hf.fit_ridge(
         fmri_train, fmri_test, design_train, design_test,
-        time_window=time_window, double_prediction=True, extra=fmri_second_test)
+        time_window=time_window, double_prediction=True, extra=fmri_train)
 
     accuracy = hf.logistic_deconvolution(
         prediction_train, prediction_test, stimuli_train, stimuli_test,

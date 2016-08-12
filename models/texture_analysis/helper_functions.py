@@ -21,6 +21,8 @@ def _read_fmri(sub, run, path, task):
 def _read_stimuli(stimuli_path, stim_set, n_tasks=6, tr=2.4, glm=False):
     """ Reads stimuli for the texture dataset and returns a numpy array of
     shape [n_scans, n_classes] """
+
+    """
     if stim_set not in [1, 2]:
         raise NotImplementedError
     if stim_set == 1:
@@ -51,6 +53,31 @@ def _read_stimuli(stimuli_path, stim_set, n_tasks=6, tr=2.4, glm=False):
         stimuli[one_index][one_class] = 1
         stimuli[two_index][two_class] = 1
         stimuli[three_index][three_class] = 1
+
+    # Fill the rest with category 'rest'
+    rest_scans = np.where(np.sum(stimuli, axis=1) == 0)
+    stimuli[rest_scans, 0] = 1
+    return stimuli
+
+    """
+    if stim_set not in [1, 2]:
+        raise NotImplementedError
+    if stim_set == 1:
+        session_stimuli = np.load(stimuli_path + '1.npy')
+    elif stim_set == 2:
+        session_stimuli = np.load(stimuli_path + '2.npy')
+
+    if glm:
+        return session_stimuli
+
+    classes = np.array(['rest', '01', '09', '12', '13', '14', '25', '0'])
+    n_scans = 184 * n_tasks
+    stimuli = np.zeros((n_scans, len(classes)))
+    for t, stim in enumerate(session_stimuli):
+        stim_class = np.where(classes == stim[:2])[0]
+        scan = int(round(t * 4) / tr)
+
+        stimuli[scan][stim_class] = 1
 
     # Fill the rest with category 'rest'
     rest_scans = np.where(np.sum(stimuli, axis=1) == 0)

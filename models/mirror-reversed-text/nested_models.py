@@ -15,8 +15,9 @@ basis = '3hrf'
 mode = 'glm'
 logistic_window = 4
 
-subject_scores = []
+all_scores = []
 for subject in subject_list:
+    subject_scores = []
     # Read data
     fmri, stimuli, runs = hf.read_data(subject, two_classes=two_classes)
     _, glm_stimuli, glm_runs = hf.read_data(subject, glm=True)
@@ -39,33 +40,49 @@ for subject in subject_list:
     # Convolve the events
     design = hf.convolve_events(labels, onsets, len(fmri), basis=basis)
 
-    lplo = LeavePLabelOut(runs, p=1)
-    runs = np.array(runs)
-    """
-    first_train = np.where(np.logical_or(runs == 0, runs == 1))[0]
-    second_train = np.where(np.logical_or(runs == 2, runs == 3))[0]
-    second_test = np.where(np.logical_or(runs == 4, runs == 5))[0]
+    big_lplo = LeavePLabelOut(runs, p=1)
+    for train, test in big_lplo:
+        fmri_train, fmri_test = fmri[train], fmri[test]
+        design_train, design_test = design[train], design[test]
+        stimuli_train, stimuli_test = stimuli[train], stimuli[test]
 
-    fmri_train, fmri_test = fmri[first_train], fmri[second_train]
-    fmri_second_test = fmri[second_test]
-    design_train, design_test = design[first_train], design[second_train]
-    stimuli_train, stimuli_test = stimuli[second_train], stimuli[second_test]
-    """
-    train = np.where(runs <= 4)[0]
-    test = np.where(runs > 4)[0]
+        """
+        small_lplo = LeavePLabelOut(big_train, p=3)
+        for log_set, ridge_set in small_lplo:
+            fmri_log, fmri_ridge = fmri[log_set], fmri[ridge_set]
+            design_log, design_ridge = design[log_set], design[ridge_set]
+            stimuli_log, stimuli_ridge = stimuli[log_set], stimuli[ridge_set]
 
-    fmri_train, fmri_test = fmri[train], fmri[test]
-    design_train, design_test = design[train], design[test]
-    stimuli_train, stimuli_test = stimuli[train], stimuli[test]
+        runs = np.array(runs)
+        first_train = np.where(np.logical_or(runs == 0, runs == 1))[0]
+        second_train = np.where(np.logical_or(runs == 2, runs == 3))[0]
+        second_test = np.where(np.logical_or(runs == 4, runs == 5))[0]
 
-    prediction_test, prediction_train, scores = hf.fit_ridge(
-        fmri_train, fmri_test, design_train, design_test,
-        time_window=time_window, double_prediction=True, extra=fmri_train)
+        fmri_train, fmri_test = fmri[first_train], fmri[second_train]
+        fmri_second_test = fmri[second_test]
+        design_train, design_test = design[first_train], design[second_train]
+        stimuli_train, stimuli_test = (stimuli[second_train],
+                                       stimuli[second_test])
 
-    accuracy = hf.logistic_deconvolution(
-        prediction_train, prediction_test, stimuli_train, stimuli_test,
-        logistic_window)
+        train = np.where(runs <= 4)[0]
+        test = np.where(runs > 4)[0]
 
-    subject_scores.append(accuracy)
+        fmri_train, fmri_test = fmri[train], fmri[test]
+        design_train, design_test = design[train], design[test]
+        stimuli_train, stimuli_test = stimuli[train], stimuli[test]
+        """
+
+        prediction_test, prediction_train, scores = hf.fit_ridge(
+            fmri_train, fmri_test, design_train, design_test,
+            time_window=time_window, double_prediction=True, extra=fmri_train)
+
+        accuracy = hf.logistic_deconvolution(
+            prediction_train, prediction_test, stimuli_train, stimuli_test,
+            logistic_window)
+
+        subject_scores.append(accuracy)
+
+    all_scores.append(subject_scores)
 
     print('finished subject ' + str(subject))
+    print(subject_scores)

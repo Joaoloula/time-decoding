@@ -1,4 +1,3 @@
-from nistats.hemodynamic_models import glover_hrf
 from nistats.design_matrix import make_design_matrix
 from nilearn.image import load_img
 from nilearn import input_data
@@ -6,6 +5,7 @@ from sklearn import linear_model, metrics, manifold, decomposition
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.pipeline import Pipeline
 import matplotlib.pyplot as plt
+import seaborn as sns
 import hrf_estimation as he
 import pandas as pd
 import numpy as np
@@ -444,10 +444,10 @@ def classification_score(prediction, stimuli, mode='regression'):
                                         stimuli[mask][:, 1: -1]))
 
     elif mode == 'glm':
-         mask = np.sum(stimuli[:, 1: -1], axis=1).astype(bool)
-         # Flip prediction to correspond to stimuli
-         prediction, stimuli = np.array((np.fliplr(prediction[mask][:, 1:]),
-                                        stimuli[mask][:, 1: -1]))
+        mask = np.sum(stimuli[:, 1: -1], axis=1).astype(bool)
+        # Flip prediction to correspond to stimuli
+        prediction, stimuli = np.array((np.fliplr(prediction[mask][:, 1:]),
+                                       stimuli[mask][:, 1: -1]))
 
     classifier = np.array([[1, 0]
                            if prediction[scan][0] > prediction[scan][1]
@@ -644,3 +644,26 @@ def embed(fmri_data, stimuli, decomposer='tsne'):
     plt.show()
 
     return embedding
+
+
+def score_barplot(score_list, model_list):
+    """ """
+    n_subjects = len(score_list[0])
+    n_models = len(model_list)
+
+    scores = np.hstack(score_list)
+    models = np.hstack([[model] * n_subjects for model in model_list])
+    subjects = range(1, n_subjects + 1) * n_models
+    dict = {}
+    dict['accuracy'] = scores
+    dict['model'] = models
+    dict['subjects'] = subjects
+    data = pd.DataFrame(dict)
+
+    plt.style.use('ggplot')
+    sns.set_context('talk', font_scale=1.5)
+    ax = sns.boxplot(x='model', y='accuracy', data=data)
+    ax.set_title('Classification accuracies for GLM and time-domain decoding')
+    ax.set_ylim(0.5, 1)
+
+    plt.show()

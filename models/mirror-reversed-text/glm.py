@@ -3,18 +3,19 @@ import helper_functions as hf
 import numpy as np
 
 # Parameters
-subject_list = [11]
+subject_list = range(14)
 time_window = 1
 delay = 0
 k = 10000
 two_classes = True
 
 # GLM parameters
-basis = 'hrf'
-mode = 'glm'
+basis = '3hrf'
+mode = 'glms'
 
-scores = []
+all_scores = []
 for subject in subject_list:
+    subject_scores = []
     # Read data
     fmri, stimuli, _ = hf.read_data(subject, two_classes=two_classes)
     _, glm_stimuli, runs = hf.read_data(subject, glm=True)
@@ -42,9 +43,10 @@ for subject in subject_list:
         labels_train, labels_test = labels[train_mask], labels[test_mask]
 
         # Fit and score logistic regression
-        scores.append(
+        subject_scores.append(
             hf.glm_scoring(beta_train, beta_test, labels_train, labels_test))
 
-        print('finished subject ' + str(subject))
+    all_scores.append(subject_scores)
 
-        break  # Only do one CV run for fast prototyping
+    print('finished subject ' + str(subject))
+    print(subject_scores)

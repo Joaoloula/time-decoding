@@ -543,7 +543,7 @@ def glm(fmri, glm_stimuli, labels, basis='hrf', mode='glm'):
         onsets[-1] = (len(fmri) - 1) * 2
 
     tr = 2.
-    frame_times = np.arange(len(fmri) * tr)
+    frame_times = np.arange(len(fmri)) * tr
     separate_conditions = xrange(len(conditions))
     paradigm = {}
     paradigm['onset'] = onsets
@@ -557,7 +557,7 @@ def glm(fmri, glm_stimuli, labels, basis='hrf', mode='glm'):
             oversample=1, hrf_length=20)
     """
     if mode == 'glm':
-        betas = np.dot(np.linalg.pinv(X[::2]), fmri)
+        betas = np.dot(np.linalg.pinv(X), fmri)
 
     return None, betas, conditions, onsets
 

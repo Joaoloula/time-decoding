@@ -1,3 +1,4 @@
+from nistats.design_matrix import make_design_matrix
 from nilearn.image import load_img
 from nilearn import input_data
 from sklearn import linear_model, metrics, manifold, decomposition
@@ -5,6 +6,7 @@ from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.pipeline import Pipeline
 import hrf_estimation as he
 import matplotlib.pyplot as plt
+import pandas as pd
 import numpy as np
 
 
@@ -75,7 +77,7 @@ def _read_stimuli(stimuli_path, stim_set, n_tasks=6, tr=2.4, glm=False):
     stimuli = np.zeros((n_scans, len(classes)))
     for t, stim in enumerate(session_stimuli):
         stim_class = np.where(classes == stim[:2])[0]
-        scan = int(round(t * 4) / tr)
+        scan = int(round(t * 4 / tr))
 
         stimuli[scan][stim_class] = 1
 
@@ -475,12 +477,24 @@ def glm(fmri, stimuli, basis='hrf', mode='glm'):
 
     tr = 2.4
     conditions = np.array([cond[:2] for cond in stimuli])
-    unique_conditions = range(len(conditions))
-    n_trials = conditions.size
+    n_trials = len(conditions)
+    unique_conditions = range(n_trials)
     onsets = np.arange(0, 4 * n_trials, 4.)
+    frame_times = np.arange(len(fmri)) * tr
 
+    paradigm = {}
+    paradigm['onset'] = onsets
+    paradigm['name'] = unique_conditions
+    paradigm = pd.DataFrame(paradigm)
+
+    X = make_design_matrix(frame_times, paradigm, hrf_model='spm')
+
+    betas = np.dot(np.linalg.pinv(X), fmri)
+    hrfs = None
+    """
     hrfs, betas = he.glm(unique_conditions, onsets, tr, fmri, basis=basis,
                          mode=mode)
+    """
 
     return hrfs, betas, conditions, onsets
 

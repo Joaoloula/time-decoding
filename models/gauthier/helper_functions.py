@@ -103,8 +103,7 @@ def read_data(subject, n_runs=2, tr=1.5, n_scans=403, glm=False,
     return fmri, stimuli, None
 
 
-def apply_time_window(fmri_train, fmri_test, stimuli_train, stimuli_test,
-                      delay=3, time_window=8, k=10000):
+def apply_time_window(fmri, stimuli, delay=3, time_window=8, k=10000):
     """
     Applies a time window to a given experiment, extending the fmri to contain
     voxel activations of all scans in that window at each time step, and
@@ -135,28 +134,23 @@ def apply_time_window(fmri_train, fmri_test, stimuli_train, stimuli_test,
     """
     # Apply the delay
     if delay != 0:
-        fmri_train, fmri_test = fmri_train[delay:], fmri_test[delay:]
-        stimuli_train, stimuli_test = (stimuli_train[:-delay],
-                                       stimuli_test[:-delay])
+        fmri = fmri[delay:]
+        stimuli = stimuli[:-delay]
 
     # Fit the anova feature selection
-    stimuli_train_1d = np.argmax(stimuli_train, axis=1)
+    stimuli_1d = np.argmax(stimuli, axis=1)
     anova = SelectKBest(f_classif, k=k)
-    fmri_train = anova.fit_transform(fmri_train, stimuli_train_1d)
-    fmri_test = anova.transform(fmri_test)
+    fmri = anova.fit_transform(fmri, stimuli_1d)
 
-    n_scans_train, n_scans_test = fmri_train.shape[0], fmri_test.shape[0]
+    n_scans = fmri.shape[0]
 
-    fmri_train = [fmri_train[scan: scan + time_window].ravel()
-                  for scan in xrange(n_scans_train - time_window + 1)]
-    fmri_test = [fmri_test[scan: scan + time_window].ravel()
-                 for scan in xrange(n_scans_test - time_window + 1)]
+    fmri = [fmri[scan: scan + time_window].ravel()
+            for scan in xrange(n_scans - time_window + 1)]
 
     if time_window != 1:
-        stimuli_train, stimuli_test = (stimuli_train[: -(time_window - 1)],
-                                       stimuli_test[: -(time_window - 1)])
+        stimuli = stimuli[: -(time_window - 1)]
 
-    return fmri_train, fmri_test, stimuli_train, stimuli_test
+    return fmri, stimuli
 
 
 def uniform_masking(fmri_list, high_pass=0.01, smoothing=5):
@@ -510,21 +504,10 @@ def logistic_deconvolution(estimation_train, estimation_test, stimuli_train,
     return accuracy
 
 
-def glm(fmri, glm_stimuli, labels, basis='hrf', mode='glm'):
+def glm(fmri, conditions, onsets, hrf_model='spm'):
     """ Fit a GLM for comparison with time decoding model """
-    onsets = np.empty(len(labels))
-    conditions = np.empty(len(labels), dtype='str')
-    start = 0
-    for run, stim in enumerate(glm_stimuli):
-        onsets[start: start + len(stim[0])] = stim[0] + (run * 410)
-        conditions[start: start + len(stim[0])] = stim[1]
-        start += len(stim[0])
 
-    # Correction for problematic onsets
-    if onsets[-1] > (len(fmri) - 1) * 2:
-        onsets[-1] = (len(fmri) - 1) * 2
-
-    tr = 2.
+    tr = 1.5
     frame_times = np.arange(len(fmri)) * tr
     separate_conditions = xrange(len(conditions))
     paradigm = {}
@@ -533,15 +516,10 @@ def glm(fmri, glm_stimuli, labels, basis='hrf', mode='glm'):
     paradigm = pd.DataFrame(paradigm)
 
     X = make_design_matrix(frame_times, paradigm, hrf_model='spm')
-    """
-    X, hrf = he.create_design_matrix(
-            separate_conditions, onsets, tr, len(fmri), basis=basis,
-            oversample=1, hrf_length=20)
-    """
-    if mode == 'glm':
-        betas = np.dot(np.linalg.pinv(X), fmri)
 
-    return None, betas, conditions, onsets
+    betas = np.dot(np.linalg.pinv(X), fmri)
+
+    return betas
 
 
 def glm_scoring(betas_train, betas_test, labels_train, labels_test):

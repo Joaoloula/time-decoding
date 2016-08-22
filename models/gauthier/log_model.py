@@ -1,4 +1,5 @@
 from sklearn.cross_validation import LeavePLabelOut
+from data_reading import read_data_gauthier
 import helper_functions as hf
 import numpy as np
 
@@ -18,17 +19,18 @@ all_scores = []
 for subject in subject_list:
     subject_scores = []
     # Read data
-    fmri, stimuli, runs = hf.read_data(subject)
-    _, glm_stimuli, glm_runs = hf.read_data(subject, glm=True)
+    fmri, stimuli, runs = read_data_gauthier(subject)
+    _, glm_stimuli, glm_runs = read_data_gauthier(subject, glm=True)
 
     # Mask the sessions uniformly and reshape the data
     fmri = hf.uniform_masking(fmri, high_pass=0.01)
 
-    # Feature extraction
+    # Feature selection
 
-    fmri, stimuli = np.array([hf.apply_time_window(
-        fmri[session], stimuli[session], delay=delay, time_window=time_window,
-        k=k) for session in range(len(fmri))]).T
+    fmri = [hf.feature_selection(fmri[session], np.zeros_like(fmri[session]),
+                                 stimuli[session],
+                                 np.zeros_like(stimuli[session]), k=k)
+            for session in range(len(fmri))]
 
     # Run the GLM
     beta = [hf.glm(

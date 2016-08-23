@@ -208,15 +208,14 @@ def design_matrix(n_scans, tr, onsets, conditions, durations=None,
     return X
 
 
-def glm(fmri, onsets, session_id, durations=None, hrf_model='spm'):
+def glm(fmri, onsets, durations=None, hrf_model='spm'):
     """ Fit a GLM for comparison with time decoding model """
     tr = 1.5
     betas = []
     for session in range(len(fmri)):
         n_scans = len(fmri[session])
         separate_conditions = xrange(len(onsets[session]))
-        X = design_matrix(n_scans, tr, onsets[session], separate_conditions,
-                          durations[session])
+        X = design_matrix(n_scans, tr, onsets[session], separate_conditions)
         session_betas = np.dot(np.linalg.pinv(X), fmri[session])
         betas.append(session_betas)
     betas = np.array(betas)

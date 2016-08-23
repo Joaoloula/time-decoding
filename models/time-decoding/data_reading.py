@@ -2,6 +2,7 @@ from nilearn.input_data import MultiNiftiMasker
 from nilearn.image import load_img
 import pandas as pd
 import numpy as np
+import pickle
 import glob
 import os
 
@@ -150,7 +151,7 @@ def _read_fmri_gauthier(sub, run, path):
 def _read_stimulus_gauthier(sub, run, path, n_scans, tr, glm=False):
     """ Reads stimulus data on Gauthier dataset """
     run = '_run00' + str(run + 1) + '.npy'
-    paradigm = np.load('stimuli_' + sub + run)
+    paradigm = np.load('new_stimuli_' + sub + run)
     onsets = paradigm[:, 0].astype('float')
     durations = paradigm[:, 1].astype('float')
     conditions = paradigm[:, -1]
@@ -158,12 +159,11 @@ def _read_stimulus_gauthier(sub, run, path, n_scans, tr, glm=False):
     if glm:
         return onsets, durations, conditions
 
-    cats = np.array(['rest', 'face', 'house', '1.0', '2.0', '3.0', '4.0', '5.0',
-                     '6.0', '7.0'])
+    cats = np.array(['rest', 'face', 'house'])
     stimuli = np.zeros((n_scans, len(cats)))
+    rounded_onsets = np.round(onsets/tr).astype(int)
     for index, condition in enumerate(conditions):
-        stim_onset = int(round(onsets[index]/tr))
-        stimuli[stim_onset, np.where(cats == condition)[0][0]] = 1
+        stimuli[rounded_onsets[index], np.where(cats == condition)[0][0]] = 1
     # Fill the rest with 'rest'
     stimuli[np.logical_not(np.sum(stimuli, axis=1).astype(bool)), 0] = 1
 
@@ -189,7 +189,7 @@ def read_data_gauthier(subject, n_runs=2, tr=1.5, n_scans=403, high_pass=0.01,
         repetition time for the task (defaults to 2)
 
     n_scans: int
-        number of scans per run, defaults to 205
+        number of scans per run, defaults to 403
 
     two_classes: bool
         whether to restrict stimuli to two classes (text vs. reversed text), or
@@ -212,26 +212,19 @@ def read_data_gauthier(subject, n_runs=2, tr=1.5, n_scans=403, high_pass=0.01,
         sub = 'sub0' + str(subject + 1)
     path += sub
 
-    stimuli = [_read_stimulus_gauthier(sub, run, path, n_scans, tr)
-               for run in range(n_runs)]
-
-    glm_stimuli = np.array(
-        [_read_stimulus_gauthier(sub, run, path, n_scans, tr, glm=True)
-         for run in range(n_runs)])
-    onsets, durations, conditions = (glm_stimuli[:, 0, :].astype(float),
-                                     glm_stimuli[:, 1, :].astype(float),
-                                     glm_stimuli[:, 2, :])
-
     fmri = [_read_fmri_gauthier(sub, run, path) for run in range(n_runs)]
     fmri = _uniform_masking(fmri, high_pass=high_pass)
 
-    session_id_fmri = [[session] * len(fmri[session])
-                       for session in range(len(fmri))]
-    session_id_onset = [[session] * len(onsets[session])
-                        for session in range(len(onsets))]
+    info = pickle.load(open('gauthier_general_info.pickle', 'rb'))
+    split_points = info['split_points']
 
-    return (fmri, stimuli, onsets, conditions, durations, session_id_fmri,
-            session_id_onset)
+    selected_fmri = [fmri[run][split: split + 20] for run in range(n_runs)
+                     for split in split_points]
+
+    onsets, conditions = info['onsets'], info['conditions']
+    stimuli = info['stimuli']
+
+    return selected_fmri, stimuli, onsets, conditions
 
 
 def _read_fmri_mrt(sub, run, path):

@@ -16,8 +16,9 @@ all_scores = []
 for subject in subject_list:
     subject_scores = []
     # Read data
-    (fmri, stimuli, onsets, conditions, durations, session_id_fmri,
-     session_id_onset) = read_data_gauthier(subject)
+    fmri, stimuli, onsets, conditions, durations = read_data_gauthier(subject)
+    session_id_fmri = [[session] * len(fmri[session])
+                       for session in range(len(fmri))]
     design = [de.design_matrix(
         len(fmri[session]), tr, onsets[session], conditions[session],
         durations[session], hrf_model) for session in range(len(fmri))]

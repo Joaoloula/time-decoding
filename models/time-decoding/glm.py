@@ -14,18 +14,15 @@ all_scores = []
 for subject in subject_list:
     subject_scores = []
     # Read data
-    (fmri, stimuli, onsets, conditions, durations, session_id_fmri,
-     session_id_onset) = read_data_gauthier(subject)
-    betas = de.glm(fmri, onsets, durations, hrf_model)
+    fmri, stimuli, onsets, conditions = read_data_gauthier(subject)
+    session_id_onset = np.load('sessions_id_onset.npy')
+    glm_onsets = np.load('glm_onsets.npy')
+    betas = de.glm(fmri, glm_onsets, hrf_model=hrf_model)
 
-    # Mask and stack the activation maps and the conditions
-    mask = np.where(np.logical_or(
-        conditions == 'face', conditions == 'house'))
-    conditions = conditions[mask]
-    betas = betas[mask]
-    masked_sessions = np.array(session_id_onset)[mask]
+    fmri = np.vstack(fmri)
+    betas = np.vstack(betas)
 
-    lplo = LeavePLabelOut(masked_sessions, p=1)
+    lplo = LeavePLabelOut(session_id_onset, p=2)
     for train_index, test_index in lplo:
         # Split into train and test sets
         betas_train, betas_test = betas[train_index], betas[test_index]

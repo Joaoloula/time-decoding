@@ -1,10 +1,10 @@
 from sklearn.cross_validation import LeavePLabelOut
-from time-decoding.data_reading import read_data_gauthier
-import time-decoding.decoding as de
+from time_decoding.data_reading import read_data_gauthier
+import time_decoding.decoding as de
 import numpy as np
 
 # Parameters
-subject_list = range(11)
+subject_list = range(1)
 tr = 1.5
 k = 10000
 
@@ -13,6 +13,7 @@ hrf_model = 'spm'
 logistic_window = 3
 
 all_scores = []
+all_predictions = []
 for subject in subject_list:
     subject_scores = []
     # Read data
@@ -44,6 +45,8 @@ for subject in subject_list:
         prediction_test, prediction_train, score = de.fit_ridge(
             fmri_train, fmri_test, design_train, design_test,
             double_prediction=True, extra=fmri_train)
+
+        all_predictions.append([design_test, prediction_test, score])
 
         # Fit a logistic regression for deconvolution
         accuracy = de.logistic_deconvolution(

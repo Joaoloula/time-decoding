@@ -176,9 +176,9 @@ def logistic_deconvolution(estimation_train, estimation_test, stimuli_train,
         for scan in xrange(len(estimation_test) - logistic_window + 1)]
 
     train_mask = np.sum(
-        stimuli_train[:len(cats_train), 1: -1], axis=1).astype(bool)
+        stimuli_train[:len(cats_train), 1:], axis=1).astype(bool)
     test_mask = np.sum(
-        stimuli_test[:len(cats_test), 1: -1], axis=1).astype(bool)
+        stimuli_test[:len(cats_test), 1:], axis=1).astype(bool)
 
     stimuli_train, stimuli_test = (
         np.argmax(stimuli_train[:len(cats_train)][train_mask], axis=1),
@@ -193,7 +193,7 @@ def logistic_deconvolution(estimation_train, estimation_test, stimuli_train,
 
 
 def design_matrix(n_scans, tr, onsets, conditions, durations=None,
-                  hrf_model='spm'):
+                  hrf_model='spm', drift_model='cosine'):
     """ """
     frame_times = np.arange(n_scans) * tr
     paradigm = {}
@@ -203,19 +203,21 @@ def design_matrix(n_scans, tr, onsets, conditions, durations=None,
         paradigm['duration'] = durations
     paradigm = pd.DataFrame(paradigm)
 
-    X = make_design_matrix(frame_times, paradigm, hrf_model=hrf_model)
+    X = make_design_matrix(frame_times, paradigm, hrf_model=hrf_model,
+                           drift_model=drift_model)
 
     return X
 
 
-def glm(fmri, onsets, durations=None, hrf_model='spm'):
+def glm(fmri, onsets, durations=None, hrf_model='spm', drift_model='cosine'):
     """ Fit a GLM for comparison with time decoding model """
     tr = 1.5
     betas = []
     for session in range(len(fmri)):
         n_scans = len(fmri[session])
         separate_conditions = xrange(len(onsets[session]))
-        X = design_matrix(n_scans, tr, onsets[session], separate_conditions)
+        X = design_matrix(n_scans, tr, onsets[session], separate_conditions,
+                          drift_model=drift_model)
         session_betas = np.dot(np.linalg.pinv(X), fmri[session])
         betas.append(session_betas)
     betas = np.array(betas)

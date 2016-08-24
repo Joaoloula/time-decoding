@@ -46,9 +46,7 @@ def plot(prediction, stimuli, scores, accuracy, delay=3, time_window=8,
 
     plt.show()
 
-
-def score_barplot(score_list, model_list):
-    """ """
+def make_dataframe(score_list, model_list):
     n_subjects = len(score_list[0])
     n_models = len(model_list)
 
@@ -61,9 +59,14 @@ def score_barplot(score_list, model_list):
     dict['subjects'] = subjects
     data = pd.DataFrame(dict)
 
+    return data
+
+
+def score_barplot(data):
+    """ """
     plt.style.use('ggplot')
     sns.set_context('talk', font_scale=1.5)
-    ax = sns.boxplot(x='model', y='accuracy', data=data)
+    ax = sns.boxplot(x='model', y='accuracy', data=data, orient='h')
     ax.set_title('Classification accuracies for GLM and time-domain decoding')
     ax.set_ylim(0.5, 1)
 

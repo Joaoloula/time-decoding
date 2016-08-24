@@ -1,6 +1,6 @@
 from sklearn.cross_validation import LeavePLabelOut
-from data_reading import read_data_gauthier
-import decoding as de
+from time-decoding.data_reading import read_data_gauthier
+import time-decoding.decoding as de
 import numpy as np
 
 # Parameters
@@ -10,18 +10,18 @@ k = 10000
 
 # GLM parameters
 hrf_model = 'spm'
-logistic_window = 4
+logistic_window = 3
 
 all_scores = []
 for subject in subject_list:
     subject_scores = []
     # Read data
-    fmri, stimuli, onsets, conditions, durations = read_data_gauthier(subject)
-    session_id_fmri = [[session] * len(fmri[session])
-                       for session in range(len(fmri))]
-    design = [de.design_matrix(
-        len(fmri[session]), tr, onsets[session], conditions[session],
-        durations[session], hrf_model) for session in range(len(fmri))]
+    fmri, stimuli, onsets, conditions = read_data_gauthier(subject)
+    session_id_fmri = [[n] * 20 for n in range(12)]
+    design = [de.design_matrix(len(fmri[session]), tr, onsets[session],
+                               conditions[session], hrf_model=hrf_model,
+                               drift_model='blank')
+              for session in range(len(fmri))]
 
     # Stack the BOLD signals and the design matrices
     fmri = np.vstack(fmri)
@@ -41,14 +41,14 @@ for subject in subject_list:
             fmri_train, fmri_test, np.argmax(stimuli_train, axis=1))
 
         # Fit a ridge regression to predict the design matrix
-        prediction_train, prediction_test, score = de.fit_ridge(
-            fmri_train, fmri_test, stimuli_train, stimuli_test,
+        prediction_test, prediction_train, score = de.fit_ridge(
+            fmri_train, fmri_test, design_train, design_test,
             double_prediction=True, extra=fmri_train)
 
         # Fit a logistic regression for deconvolution
         accuracy = de.logistic_deconvolution(
-            prediction_train, prediction_test, stimuli_train[:, :4],
-            stimuli_test[:, :4], logistic_window)
+            prediction_train, prediction_test, stimuli_train,
+            stimuli_test, logistic_window)
 
         subject_scores.append(accuracy)
 

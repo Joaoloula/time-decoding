@@ -1,6 +1,6 @@
 from sklearn.cross_validation import LeavePLabelOut
-from data_reading import read_data_gauthier
-import decoding as de
+from time-decoding.data_reading import read_data_gauthier
+import time-decoding.decoding as de
 import numpy as np
 
 # Parameters
@@ -16,13 +16,12 @@ for subject in subject_list:
     # Read data
     fmri, stimuli, onsets, conditions = read_data_gauthier(subject)
     session_id_onset = np.load('sessions_id_onset.npy')
-    glm_onsets = np.load('glm_onsets.npy')
-    betas = de.glm(fmri, glm_onsets, hrf_model=hrf_model)
+    betas = de.glm(fmri, onsets, hrf_model=hrf_model, drift_model='blank')
 
-    fmri = np.vstack(fmri)
     betas = np.vstack(betas)
+    conditions = np.hstack(conditions)
 
-    lplo = LeavePLabelOut(session_id_onset, p=2)
+    lplo = LeavePLabelOut(session_id_onset, p=1)
     for train_index, test_index in lplo:
         # Split into train and test sets
         betas_train, betas_test = betas[train_index], betas[test_index]
@@ -31,7 +30,7 @@ for subject in subject_list:
 
         # Feature selection
         betas_train, betas_test = de.feature_selection(betas_train, betas_test,
-                                                       conditions_train)
+                                                       conditions_train, k=k)
 
         # Fit a logistic regression to score the model
         accuracy = de.glm_scoring(betas_train, betas_test, conditions_train,

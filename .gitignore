@@ -5,6 +5,5 @@
 *.pickle
 *.nii.gz
 *.npy
-models/mixed_gambles/
-models/vim2/
-old/
+old_models
+scripts/gauthier_stimuli_reader.py

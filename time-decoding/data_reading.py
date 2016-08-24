@@ -7,7 +7,7 @@ import glob
 import os
 
 
-def _uniform_masking(fmri_list, high_pass=0.01, smoothing=5):
+def _uniform_masking(fmri_list, tr, high_pass=0.01, smoothing=5):
     """ Mask all the sessions uniformly, doing standardization, linear
     detrending, DCT high_pas filtering and gaussian smoothing.
 
@@ -32,7 +32,7 @@ def _uniform_masking(fmri_list, high_pass=0.01, smoothing=5):
     """
     masker = MultiNiftiMasker(mask_strategy='epi', standardize=True,
                               detrend=True, high_pass=0.01,
-                              t_r=2, smoothing_fwhm=smoothing)
+                              t_r=tr, smoothing_fwhm=smoothing)
     fmri_list_masked = masker.fit_transform(fmri_list)
 
     return fmri_list_masked
@@ -213,9 +213,9 @@ def read_data_gauthier(subject, n_runs=2, tr=1.5, n_scans=403, high_pass=0.01,
     path += sub
 
     fmri = [_read_fmri_gauthier(sub, run, path) for run in range(n_runs)]
-    fmri = _uniform_masking(fmri, high_pass=high_pass)
+    fmri = _uniform_masking(fmri, tr=tr, high_pass=high_pass)
 
-    info = pickle.load(open('gauthier_general_info.pickle', 'rb'))
+    info = pickle.load(open('gauthier_general_info_new.pickle', 'rb'))
     split_points = info['split_points']
 
     selected_fmri = [fmri[run][split: split + 20] for run in range(n_runs)

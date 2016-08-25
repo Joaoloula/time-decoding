@@ -7,3 +7,6 @@
 *.npy
 old_models
 scripts/gauthier_stimuli_reader.py
+build
+dist
+time_decoding.egg-info

@@ -38,11 +38,10 @@ def _uniform_masking(fmri_list, tr, high_pass=0.01, smoothing=5):
     return fmri_list_masked
 
 
-def _read_fmri_texture(sub, run, path, task):
+def _read_fmri_texture(sub, path, task):
     """ Reads BOLD signal data on Texture dataset """
-    run = sub + '_' + str(run + 1)
-    fmri_path = (('{path}{run}/fmri/cra{run}_td{task}.nii')
-                 .format(path=path, task=task+1, run=run))
+    fmri_path = (('{path}{sub}/fmri/cra{sub}_td{task}.nii')
+                 .format(path=path, task=task+1, sub=sub))
     fmri = load_img(fmri_path)
 
     return fmri
@@ -55,17 +54,20 @@ def _read_stimuli_texture(stimuli_path, stim_set, n_tasks=6, tr=2.4, glm=False):
     if stim_set not in [1, 2]:
         raise NotImplementedError
     if stim_set == 1:
-        session_stimuli = np.load(stimuli_path + '1.npy')
+        conditions = np.load(stimuli_path + '1.npy')
+        conditions = np.array([cond[:2] for cond in conditions]).reshape(6, -1)
     elif stim_set == 2:
-        session_stimuli = np.load(stimuli_path + '2.npy')
+        conditions = np.load(stimuli_path + '2.npy')
+        conditions = np.array([cond[:2] for cond in conditions]).reshape(6, -1)
+    onsets = [np.arange(len(cond)) * 4. for cond in conditions]
 
     if glm:
-        return session_stimuli
+        return onsets, conditions
 
     classes = np.array(['rest', '01', '09', '12', '13', '14', '25', '0'])
     n_scans = 184 * n_tasks
     stimuli = np.zeros((n_scans, len(classes)))
-    for t, stim in enumerate(session_stimuli):
+    for t, stim in enumerate(conditions.ravel()):
         stim_class = np.where(classes == stim[:2])[0]
         scan = int(round(t * 4 / tr))
 
@@ -77,8 +79,9 @@ def _read_stimuli_texture(stimuli_path, stim_set, n_tasks=6, tr=2.4, glm=False):
     return stimuli
 
 
-def read_data_texture(subject, n_runs=2, n_tasks=6, glm=False, n_scans=205,
-    tr=2.4, path='/home/loula/Programming/python/neurospin/TextureAnalysis/'):
+def read_data_texture(subject, n_tasks=6, n_scans=205, tr=2.4,
+                      path=('/home/loula/Programming/python/neurospin/Texture'
+                            'Analysis/')):
     """
     Reads data from the Texture dataset.
 
@@ -87,9 +90,6 @@ def read_data_texture(subject, n_runs=2, n_tasks=6, glm=False, n_scans=205,
 
     subject: int from 0 to 3
         subject from which to read the data
-
-    n_runs: int from 1 to 3
-        number of runs to read from the subject, defaults to 2
 
     n_tasks: int from 1 to 6
         number of tasks to read from the subject, defaults to 6
@@ -119,23 +119,30 @@ def read_data_texture(subject, n_runs=2, n_tasks=6, glm=False, n_scans=205,
 
     """
     # Create list with subject ids and the set of stim for each of their runs
-    subject_list = ['pf120155', 'ns110383', 'ap100009', 'pb120360']
-    stim_sets = {'pf120155': [1, 2],
-                 'ns110383': [1, 2],
-                 'ap100009': [1, 1, 2],
-                 'pb120360': [1, 1]}
+    subject_list = ['pf120155_1', 'pf120155_2', 'ns110383_1', 'ns110383_2',
+                    'ap100009_1', 'ap100009_2', 'ap100009_3', 'pb120360_1',
+                    'pb120360_2']
+    stim_sets = {'pf120155_1': 1,
+                 'pf120155_2': 2,
+                 'ns110383_1': 1,
+                 'ns110383_2': 2,
+                 'ap100009_1': 1,
+                 'ap100009_2': 1,
+                 'ap100009_3': 2,
+                 'pb120360_1': 1}
 
+    # Read stimuli and fmri data
     sub = subject_list[subject]
-
-    stimuli = [_read_stimuli_texture(path+'stimuli/im_names_set',
-                                     stim_sets[sub][run], glm=glm)
-               for run in range(n_runs)]
-
-    path += sub + '/'
-    fmri = [_read_fmri_texture(sub, run, path, task) for run in range(n_runs)
+    stimuli = _read_stimuli_texture(path+'stimuli/im_names_set', stim_sets[sub],
+                                    glm=False)
+    onsets, conditions = _read_stimuli_texture(path+'stimuli/im_names_set',
+                                               stim_sets[sub], glm=True)
+    path += sub[: -2] + '/'
+    fmri = [_read_fmri_texture(sub, path, task)
             for task in range(n_tasks)]
+    fmri = _uniform_masking(fmri, tr=tr)
 
-    return fmri, stimuli
+    return fmri, stimuli, onsets, conditions
 
 
 def _read_fmri_gauthier(sub, run, path):
@@ -148,31 +155,9 @@ def _read_fmri_gauthier(sub, run, path):
     return fmri
 
 
-def _read_stimulus_gauthier(sub, run, path, n_scans, tr, glm=False):
-    """ Reads stimulus data on Gauthier dataset """
-    run = '_run00' + str(run + 1) + '.npy'
-    paradigm = np.load('new_stimuli_' + sub + run)
-    onsets = paradigm[:, 0].astype('float')
-    durations = paradigm[:, 1].astype('float')
-    conditions = paradigm[:, -1]
-
-    if glm:
-        return onsets, durations, conditions
-
-    cats = np.array(['rest', 'face', 'house'])
-    stimuli = np.zeros((n_scans, len(cats)))
-    rounded_onsets = np.round(onsets/tr).astype(int)
-    for index, condition in enumerate(conditions):
-        stimuli[rounded_onsets[index], np.where(cats == condition)[0][0]] = 1
-    # Fill the rest with 'rest'
-    stimuli[np.logical_not(np.sum(stimuli, axis=1).astype(bool)), 0] = 1
-
-    return stimuli
-
-
 def read_data_gauthier(subject, n_runs=2, tr=1.5, n_scans=403, high_pass=0.01,
-    path=('/home/loula/Programming/python/neurospin/gauthier2009resonance/'
-          'results/')):
+                       path=('/home/loula/Programming/python/neurospin/gauthier'
+                             '2009resonance/results/')):
     """
     Reads data from the Gauthier dataset.
 
@@ -273,8 +258,8 @@ def _read_stimulus_mrt(sub, run, path, n_scans, tr, two_classes, glm=False):
 
 
 def read_data_mrt(subject, n_runs=6, tr=2, n_scans=205, two_classes=False,
-    path='/home/loula/Programming/python/neurospin/ds006_R2.0.0/results/',
-    glm=False):
+                  path=('/home/loula/Programming/python/neurospin/ds006_R2.0.0/'
+                        'results/'), glm=False):
     """
     Reads data from the Mirror-Reversed Text dataset.
 

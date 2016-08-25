@@ -1,5 +1,5 @@
 from sklearn.cross_validation import LeavePLabelOut
-from time_decoding.data_reading import read_data_gauthier
+from time_decoding.data_reading import read_data_texture
 import time_decoding.decoding as de
 import numpy as np
 
@@ -17,12 +17,11 @@ all_predictions = []
 for subject in subject_list:
     subject_scores = []
     # Read data
-    fmri, stimuli, onsets, conditions = read_data_gauthier(subject)
+    fmri, stimuli, onsets, conditions = read_data_texture(subject)
     session_id_fmri = [[session] * len(fmri[session])
                        for session in range(len(fmri))]
     design = [de.design_matrix(len(fmri[session]), tr, onsets[session],
-                               conditions[session], hrf_model=hrf_model,
-                               drift_model='blank')
+                               conditions[session], hrf_model=hrf_model)
               for session in range(len(fmri))]
 
     # Stack the BOLD signals and the design matrices
@@ -51,8 +50,8 @@ for subject in subject_list:
 
         # Fit a logistic regression for deconvolution
         accuracy = de.logistic_deconvolution(
-            prediction_train, prediction_test, stimuli_train,
-            stimuli_test, logistic_window)
+            prediction_train, prediction_test, stimuli_train[:-1],
+            stimuli_test[:-1], logistic_window)
 
         subject_scores.append(accuracy)
 

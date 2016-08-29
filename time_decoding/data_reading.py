@@ -224,7 +224,7 @@ def _read_fmri_mrt(sub, run, path):
     return fmri
 
 
-def _read_stimulus_mrt(sub, run, path, n_scans, tr, two_classes, glm=False):
+def _read_stimulus_mrt(sub, run, path, n_scans, tr, glm=False):
     """ Reads stimulus data on Mirror-Reversed Text dataset """
     run = 'run-0' + str(run + 1)
     task = 'task-livingnonlivingdecisionwithplainormirrorreversedtext'
@@ -233,33 +233,31 @@ def _read_stimulus_mrt(sub, run, path, n_scans, tr, two_classes, glm=False):
                    .format(path=path, sub=sub, task=task, run=run))
 
     paradigm = pd.read_csv(onsets_path, sep='\t')
-    onsets, durations, conditions = (paradigm['onset'], paradigm['duration'],
-                                     paradigm['trial_type'])
+    onsets, durations, conditions = (np.array(paradigm['onset']),
+                                     np.array(paradigm['duration']),
+                                     np.array(paradigm['trial_type']))
+    # Restrict classes to "plain" and "mirror" by slicing strings
+    conditions = [conditions[event][:2] for event in range(len(conditions))]
     if glm:
         return onsets, conditions
 
-    cats = np.array(['rest', 'junk', 'pl_ns', 'pl_sw', 'mr_ns', 'mr_sw'])
+    cats = np.array(['rest', 'ju', 'pl', 'mr'])
     stimuli = np.zeros((n_scans, len(cats)))
     for index, condition in enumerate(conditions):
-        stim_onset = int(onsets.loc[index])/tr
-        stim_duration = 1 + int(durations.loc[index])/tr
+        stim_onset = int(onsets[index])/tr
+        stim_duration = 1 + int(durations[index])/tr
         (stimuli[stim_onset: stim_onset + stim_duration,
                  np.where(cats == condition)[0][0]]) = 1
     # Fill the rest with 'rest'
     stimuli[np.logical_not(np.sum(stimuli, axis=1).astype(bool)), 0] = 1
 
-    if two_classes:
-        stimuli = np.array([stimuli[:, 0],
-                            stimuli[:, 2] + stimuli[:, 3],
-                            stimuli[:, 4] + stimuli[:, 5],
-                            stimuli[:, 1]]).T
-
     return stimuli
 
 
-def read_data_mrt(subject, n_runs=6, tr=2, n_scans=205, two_classes=False,
+def read_data_mrt(subject, n_runs=6, tr=2, n_scans=205,
+                  high_pass=0.01, glm=False,
                   path=('/home/loula/Programming/python/neurospin/ds006_R2.0.0/'
-                        'results/'), glm=False):
+                        'results/')):
     """
     Reads data from the Mirror-Reversed Text dataset.
 
@@ -299,22 +297,23 @@ def read_data_mrt(subject, n_runs=6, tr=2, n_scans=205, two_classes=False,
         sub = 'sub-' + str(subject + 1)
     path += sub
 
+    # Do not include missing runs
     os.chdir(path + "/ses-test/func/")
     runs = []
     for run in range(n_runs):
         if glob.glob("*run-0" + str(run + 1) + "*"):
             runs.append(run)
 
-    stimuli = [_read_stimulus_mrt(sub, run, path, n_scans, tr, two_classes, glm)
+    stimuli = [_read_stimulus_mrt(sub, run, path, n_scans, tr)
                for run in runs]
 
     fmri = [_read_fmri_mrt(sub, run, path) for run in runs]
+    fmri = _uniform_masking(fmri, tr=tr, high_pass=high_pass)
 
-    labels = []
-    for run_n in range(len(runs)):
-        if glm:
-            labels += [runs[run_n]] * len(stimuli[run_n][0])
-        else:
-            labels += [runs[run_n]] * n_scans
+    glm_stimuli = [_read_stimulus_mrt(
+        sub, run, path, n_scans, tr, glm=True)
+        for run in runs]
+    onsets = [glm_stimuli[run][0] for run in range(len(glm_stimuli))]
+    conditions = [glm_stimuli[run][1] for run in range(len(glm_stimuli))]
 
-    return fmri, stimuli, labels
+    return fmri, stimuli, onsets, conditions

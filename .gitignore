@@ -5,7 +5,9 @@
 *.pickle
 *.nii.gz
 *.npy
+setup.py
 old_models
+simulations/old
 scripts/gauthier_stimuli_reader.py
 build
 dist

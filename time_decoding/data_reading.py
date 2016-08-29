@@ -79,8 +79,8 @@ def _read_stimuli_texture(stimuli_path, stim_set, n_tasks=6, tr=2.4, glm=False):
     return stimuli
 
 
-def read_data_texture(subject, n_tasks=6, n_scans=205, tr=2.4,
-                      path=('/home/loula/Programming/python/neurospin/Texture'
+def read_data_texture(subject, n_tasks=6, tr=2.4,
+                      path=('/home/parietal/eickenbe/workspace/data/Texture'
                             'Analysis/')):
     """
     Reads data from the Texture dataset.
@@ -133,9 +133,10 @@ def read_data_texture(subject, n_tasks=6, n_scans=205, tr=2.4,
 
     # Read stimuli and fmri data
     sub = subject_list[subject]
-    stimuli = _read_stimuli_texture(path+'stimuli/im_names_set', stim_sets[sub],
-                                    glm=False)
-    onsets, conditions = _read_stimuli_texture(path+'stimuli/im_names_set',
+    drago_path = '/home/parietal/jloulagu/TextureDataset/'
+    stimuli = _read_stimuli_texture(drago_path+'stimuli/im_names_set', 
+                                    stim_sets[sub], glm=False)
+    onsets, conditions = _read_stimuli_texture(drago_path+'stimuli/im_names_set',
                                                stim_sets[sub], glm=True)
     path += sub[: -2] + '/'
     fmri = [_read_fmri_texture(sub, path, task)

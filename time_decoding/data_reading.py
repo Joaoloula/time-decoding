@@ -134,10 +134,10 @@ def read_data_texture(subject, n_tasks=6, tr=2.4,
     # Read stimuli and fmri data
     sub = subject_list[subject]
     drago_path = '/home/parietal/jloulagu/TextureDataset/'
-    stimuli = _read_stimuli_texture(drago_path+'stimuli/im_names_set', 
+    stimuli = _read_stimuli_texture(drago_path+'stimuli/im_names_set',
                                     stim_sets[sub], glm=False)
-    onsets, conditions = _read_stimuli_texture(drago_path+'stimuli/im_names_set',
-                                               stim_sets[sub], glm=True)
+    onsets, conditions = _read_stimuli_texture(
+        drago_path+'stimuli/im_names_set', stim_sets[sub], glm=True)
     path += sub[: -2] + '/'
     fmri = [_read_fmri_texture(sub, path, task)
             for task in range(n_tasks)]
@@ -299,11 +299,13 @@ def read_data_mrt(subject, n_runs=6, tr=2, n_scans=205,
     path += sub
 
     # Do not include missing runs
+    owd = os.getcwd()
     os.chdir(path + "/ses-test/func/")
     runs = []
     for run in range(n_runs):
         if glob.glob("*run-0" + str(run + 1) + "*"):
             runs.append(run)
+    os.chdir(owd)
 
     stimuli = [_read_stimulus_mrt(sub, run, path, n_scans, tr)
                for run in runs]

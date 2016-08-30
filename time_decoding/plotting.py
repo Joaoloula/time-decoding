@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
+import pickle
 
 
 def plot(prediction, stimuli, scores, accuracy, delay=3, time_window=8,
@@ -46,6 +47,7 @@ def plot(prediction, stimuli, scores, accuracy, delay=3, time_window=8,
 
     plt.show()
 
+
 def make_dataframe(score_list, model_list):
     n_subjects = len(score_list[0])
     n_models = len(model_list)
@@ -69,5 +71,44 @@ def score_barplot(data):
     ax = sns.boxplot(x='model', y='accuracy', data=data, orient='h')
     ax.set_title('Classification accuracies for GLM and time-domain decoding')
     ax.set_ylim(0.5, 1)
+
+    plt.show()
+
+
+def figure_mrt_time_series():
+    """ """
+    # General settings
+    sns.set_context('paper')
+    sns.set(font='serif')
+    sns.set_style("white", {
+        "font.family": "serif",
+        "font.serif": ["Times", "Palatino", "serif"]
+    })
+
+    # Load data
+    data = pickle.load(open('data_figure_mrt_time_series.pickle', 'rb'))
+
+    # Plot
+    f, (ax1, ax2) = plt.subplots(2, sharey=True)
+
+    # First subplot
+    ground_truth1 = ax1.plot(data['plain']['ground-truth'][:200],
+                             label='Ground-truth')
+    prediction1 = ax1.plot(data['plain']['prediction'][:200],
+                           label='Prediction')
+    ax1.text(180, 0.035, 'R2 score: {0:.2f}'.format(data['plain']['score']))
+    ax1.set_ylabel('Plain word activation')
+    ax1.get_xaxis().set_ticks([])
+    ax1.yaxis.set_ticklabels([])
+    f.legend([ground_truth1, prediction1], ['Ground-truth', 'Prediction'])
+
+    # Second subplot
+    ground_truth2 = ax2.plot(data['mirror']['ground-truth'][:200],
+                             label='Ground-truth')
+    prediction2 = ax2.plot(data['mirror']['prediction'][:200],
+                           label='Prediction')
+    ax2.text(180, 0.035, 'R2 score: {0:.2f}'.format(data['mirror']['score']))
+    ax2.set_ylabel('Mirror word activation')
+    ax2.get_xaxis().set_ticks([])
 
     plt.show()

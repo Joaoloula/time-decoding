@@ -4,13 +4,13 @@ import time_decoding.decoding as de
 import numpy as np
 
 # Parameters
-subject_list = range(1)
+subject_list = [12]
 tr = 2.
 k = 10000
 
 # GLM parameters
 hrf_model = 'spm'
-logistic_window = 3
+logistic_window = 4
 
 all_scores = []
 all_predictions = []

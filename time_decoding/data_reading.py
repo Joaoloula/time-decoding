@@ -302,11 +302,13 @@ def read_data_mrt(subject, n_runs=6, tr=2, n_scans=205,
     path += sub
 
     # Do not include missing runs
+    owd = os.getcwd()
     os.chdir(path + "/ses-test/func/")
     runs = []
     for run in range(n_runs):
         if glob.glob("*run-0" + str(run + 1) + "*"):
             runs.append(run)
+    os.chdir(owd)
 
     stimuli = [_read_stimulus_mrt(sub, run, path, n_scans, tr)
                for run in runs]

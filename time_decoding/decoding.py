@@ -1,5 +1,5 @@
 from sklearn.feature_selection import SelectKBest, f_classif
-from nistats.design_matrix import make_design_matrix
+from nistats.design_matrix import make_design_matrix, plot_design_matrix
 from sklearn import linear_model, metrics
 import pandas as pd
 import numpy as np
@@ -205,24 +205,29 @@ def design_matrix(n_scans, tr, onsets, conditions, durations=None,
 
     X = make_design_matrix(frame_times, paradigm, hrf_model=hrf_model,
                            drift_model=drift_model)
-
     return X
 
 
-def glm(fmri, onsets, durations=None, hrf_model='spm', drift_model='cosine'):
+def glm(fmri, onsets, conditions=None, durations=None, hrf_model='spm', drift_model='cosine'):
     """ Fit a GLM for comparison with time decoding model """
-    tr = 1.5
+    tr = 2.4
     betas = []
+    regressors = []
     for session in range(len(fmri)):
         n_scans = len(fmri[session])
-        separate_conditions = xrange(len(onsets[session]))
+        if conditions is not None:
+            separate_conditions = conditions[session]
+        else:
+            separate_conditions = np.arange(len(onsets[session]))
         X = design_matrix(n_scans, tr, onsets[session], separate_conditions,
                           drift_model=drift_model)
         session_betas = np.dot(np.linalg.pinv(X), fmri[session])
         betas.append(session_betas)
-    betas = np.array(betas)
+        regressors.append(X.columns)
 
-    return betas
+    betas = np.array(betas)
+    regressors = np.array(regressors)
+    return betas, regressors
 
 
 def glm_scoring(betas_train, betas_test, labels_train, labels_test):
@@ -230,5 +235,4 @@ def glm_scoring(betas_train, betas_test, labels_train, labels_test):
     log = linear_model.LogisticRegression()
     log.fit(betas_train, labels_train)
     score = log.score(betas_test, labels_test)
-
     return score

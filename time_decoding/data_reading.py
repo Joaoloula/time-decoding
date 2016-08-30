@@ -133,11 +133,14 @@ def read_data_texture(subject, n_tasks=6, tr=2.4,
 
     # Read stimuli and fmri data
     sub = subject_list[subject]
-    drago_path = '/home/parietal/jloulagu/TextureDataset/'
-    stimuli = _read_stimuli_texture(drago_path+'stimuli/im_names_set', 
-                                    stim_sets[sub], glm=False)
-    onsets, conditions = _read_stimuli_texture(drago_path+'stimuli/im_names_set',
-                                               stim_sets[sub], glm=True)
+    drago_path = '' # '/home/parietal/jloulagu/TextureDataset/stimuli'
+    stimuli = _read_stimuli_texture(
+        drago_path + 'im_names_set', stim_sets[sub], glm=False)
+    onsets, _ = _read_stimuli_texture(
+        drago_path + 'im_names_set', stim_sets[sub], glm=True)
+    # override conditions
+    conditions = np.load(
+        drago_path + "im_names_set%d.npy" % stim_sets[sub]).reshape(6, -1)
     path += sub[: -2] + '/'
     fmri = [_read_fmri_texture(sub, path, task)
             for task in range(n_tasks)]

@@ -15,22 +15,25 @@ for subject in subject_list:
     subject_scores = []
     # Read data
     fmri, stimuli, onsets, conditions = read_data_texture(subject)
-    session_id_onset = np.array([[session] * len(onsets[session])
+    betas, regressors = de.glm(fmri, onsets, conditions, hrf_model=hrf_model)
+    session_id_onset = np.array([[session] * len(betas[0])
                                  for session in range(len(onsets))]).ravel()
-    betas = de.glm(fmri, onsets, hrf_model=hrf_model)
-
     betas = np.vstack(betas)
-    conditions = np.hstack(conditions)
-
+    conditions = np.hstack(regressors)
+    conditions_ = np.array([condition[:2] for condition in conditions])
     lplo = LeavePLabelOut(session_id_onset, p=1)
     for train_index, test_index in lplo:
         # Split into train and test sets
         betas_train, betas_test = betas[train_index], betas[test_index]
-        conditions_train, conditions_test = (conditions[train_index],
-                                             conditions[test_index])
+        conditions_train, conditions_test = (conditions_[train_index],
+                                             conditions_[test_index])
         # Mask to remove '0' category
-        train_mask = conditions_train != '0'
-        test_mask = conditions_test != '0'
+        train_mask = np.array([
+            ct in ['01', '09', '12', '13', '14', '25']
+            for ct in conditions_train])
+        test_mask = np.array([
+            ct in ['01', '09', '12', '13', '14', '25']
+            for ct in conditions_test])
         betas_train, conditions_train = [betas_train[train_mask],
                                          conditions_train[train_mask]]
         betas_test, conditions_test = [betas_test[test_mask],

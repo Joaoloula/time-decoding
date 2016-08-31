@@ -75,40 +75,79 @@ def score_barplot(data):
     plt.show()
 
 
-def figure_mrt_time_series():
+def data_mrt_time_series(all_predictions_session, stimuli_session):
     """ """
+    design = all_predictions_session[0]
+    prediction = all_predictions_session[1]
+
+    mirror = {}
+    mirror['ground-truth'] = design[:, 1]
+    mirror['prediction'] = prediction[:, 1]
+    mirror['onsets'] = stimuli_session[:, 3]
+    mirror['score'] = all_predictions_session[-1][1]
+
+    plain = {}
+    plain['ground-truth'] = design[:, 2]
+    plain['prediction'] = prediction[:, 2]
+    plain['onsets'] = stimuli_session[:, 2]
+    plain['score'] = all_predictions_session[-1][2]
+
+    dict = {}
+    dict['plain'] = plain
+    dict['mirror'] = mirror
+
+    pickle.dump(dict, open('data_figure_mrt_time_series.pickle', 'wb'))
+
+
+def figure_mrt_time_series():
+    """ Create figure comparing ground-truth and predicted time-series for both
+    classes in mirror-reversed text"""
     # General settings
-    sns.set_context('paper')
     sns.set(font='serif')
     sns.set_style("white", {
         "font.family": "serif",
         "font.serif": ["Times", "Palatino", "serif"]
     })
+    sns.set_context('paper', font_scale=2)
 
     # Load data
     data = pickle.load(open('data_figure_mrt_time_series.pickle', 'rb'))
+    time = np.arange(200) * 2
 
     # Plot
     f, (ax1, ax2) = plt.subplots(2, sharey=True)
 
     # First subplot
-    ground_truth1 = ax1.plot(data['plain']['ground-truth'][:200],
-                             label='Ground-truth')
-    prediction1 = ax1.plot(data['plain']['prediction'][:200],
-                           label='Prediction')
-    ax1.text(180, 0.035, 'R2 score: {0:.2f}'.format(data['plain']['score']))
-    ax1.set_ylabel('Plain word activation')
+    ax1.plot(time, data['mirror']['ground-truth'][:200], linewidth=2.5,
+             label='Ground-truth')
+    ax1.plot(time, data['mirror']['prediction'][:200], linewidth=2.5,
+             label='Prediction')
+    ax1.vlines(np.where(data['mirror']['onsets'][:200])[0] * 2, -0.015, -0.005,
+               linewidth=2.5, label='Onsets')
+    ax1.text(346, 0.035, 'R2 score: {0:.2f}'.format(data['mirror']['score']))
+    ax1.set_ylabel('Mirror word activation')
     ax1.get_xaxis().set_ticks([])
-    ax1.yaxis.set_ticklabels([])
-    f.legend([ground_truth1, prediction1], ['Ground-truth', 'Prediction'])
+    ax1.legend(loc='upper left', ncol=2)
 
     # Second subplot
-    ground_truth2 = ax2.plot(data['mirror']['ground-truth'][:200],
-                             label='Ground-truth')
-    prediction2 = ax2.plot(data['mirror']['prediction'][:200],
-                           label='Prediction')
-    ax2.text(180, 0.035, 'R2 score: {0:.2f}'.format(data['mirror']['score']))
-    ax2.set_ylabel('Mirror word activation')
-    ax2.get_xaxis().set_ticks([])
+    ax2.plot(time, data['plain']['ground-truth'][:200], linewidth=2.5,
+             label='Ground-truth')
+    ax2.plot(time, data['plain']['prediction'][:200], linewidth=2.5,
+             label='Prediction')
+    ax2.vlines(np.where(data['plain']['onsets'][:200])[0] * 2, -0.015, -0.005,
+               linewidth=2.5, label='Onsets')
+    ax2.text(346, 0.035, 'R2 score: {0:.2f}'.format(data['plain']['score']))
+    ax2.set_ylabel('Plain word activation')
+    ax2.set_xlabel('Time (seconds)')
+    ax2.yaxis.set_ticklabels([])
+
+    # Remove frames
+    ax1.spines['top'].set_visible(False)
+    ax1.spines['right'].set_visible(False)
+    ax1.spines['left'].set_visible(False)
+    ax1.spines['bottom'].set_visible(False)
+    ax2.spines['top'].set_visible(False)
+    ax2.spines['right'].set_visible(False)
+    ax2.spines['left'].set_visible(False)
 
     plt.show()

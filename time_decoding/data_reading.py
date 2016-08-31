@@ -246,9 +246,9 @@ def _read_stimulus_mrt(sub, run, path, n_scans, tr, glm=False):
     stimuli = np.zeros((n_scans, len(cats)))
     for index, condition in enumerate(conditions):
         stim_onset = int(onsets[index])/tr
-        stim_duration = 1 + int(durations[index])/tr
-        (stimuli[stim_onset: stim_onset + stim_duration,
-                 np.where(cats == condition)[0][0]]) = 1
+        # stim_duration = 1 + int(durations[index])/tr
+        stimuli[stim_onset, np.where(cats == condition)[0][0]] = 1
+
     # Fill the rest with 'rest'
     stimuli[np.logical_not(np.sum(stimuli, axis=1).astype(bool)), 0] = 1
 

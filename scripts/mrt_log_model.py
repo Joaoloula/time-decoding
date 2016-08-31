@@ -56,6 +56,8 @@ for subject in subject_list:
 
         subject_scores.append(accuracy)
 
+        break
+
     all_scores.append(subject_scores)
 
     print('finished subject ' + str(subject))

@@ -1,8 +1,35 @@
+from matplotlib import colors
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
 import pickle
+
+
+def general_settings():
+    sns.set(font='serif')
+    sns.set_style("white", {
+        "font.family": "serif",
+        "font.serif": ["Times", "Palatino", "serif"]
+    })
+    sns.set_context('paper', font_scale=2, rc={"lines.linewidth": 2.5})
+
+
+def shift_value(rgb, shift):
+    hsv = colors.rgb_to_hsv(rgb)
+    hsv[-1] += shift
+    return colors.hsv_to_rgb(hsv)
+
+
+def color_palette(n_colors):
+    orig_palette = sns.color_palette(n_colors=n_colors)
+    shifts = np.linspace(-.3, .3, n_colors)
+    alternate_shifts = shifts.copy()
+    alternate_shifts[::2] = shifts[:len(shifts[::2])]
+    alternate_shifts[1::2] = shifts[len(shifts[::2]):]
+    palette = [shift_value(col, shift)
+               for col, shift in zip(orig_palette, alternate_shifts)]
+    return palette
 
 
 def plot(prediction, stimuli, scores, accuracy, delay=3, time_window=8,
@@ -102,13 +129,7 @@ def data_mrt_time_series(all_predictions_session, stimuli_session):
 def figure_mrt_time_series():
     """ Create figure comparing ground-truth and predicted time-series for both
     classes in mirror-reversed text"""
-    # General settings
-    sns.set(font='serif')
-    sns.set_style("white", {
-        "font.family": "serif",
-        "font.serif": ["Times", "Palatino", "serif"]
-    })
-    sns.set_context('paper', font_scale=2)
+    general_settings()
 
     # Load data
     data = pickle.load(open('data_figure_mrt_time_series.pickle', 'rb'))
@@ -117,13 +138,16 @@ def figure_mrt_time_series():
     # Plot
     f, (ax1, ax2) = plt.subplots(2, sharey=True)
 
+    # Colors
+    cmap = color_palette(3)
+
     # First subplot
     ax1.plot(time, data['mirror']['ground-truth'][:200], linewidth=2.5,
-             label='Ground-truth')
+             label='Ground-truth', color=cmap[0])
     ax1.plot(time, data['mirror']['prediction'][:200], linewidth=2.5,
-             label='Prediction')
+             label='Prediction', color=cmap[1])
     ax1.vlines(np.where(data['mirror']['onsets'][:200])[0] * 2, -0.015, -0.005,
-               linewidth=2.5, label='Onsets')
+               linewidth=2.5, label='Onsets', color=cmap[2])
     ax1.text(346, 0.035, 'R2 score: {0:.2f}'.format(data['mirror']['score']))
     ax1.set_ylabel('Mirror word activation')
     ax1.get_xaxis().set_ticks([])
@@ -131,11 +155,11 @@ def figure_mrt_time_series():
 
     # Second subplot
     ax2.plot(time, data['plain']['ground-truth'][:200], linewidth=2.5,
-             label='Ground-truth')
+             label='Ground-truth', color=cmap[0])
     ax2.plot(time, data['plain']['prediction'][:200], linewidth=2.5,
-             label='Prediction')
+             label='Prediction', color=cmap[1])
     ax2.vlines(np.where(data['plain']['onsets'][:200])[0] * 2, -0.015, -0.005,
-               linewidth=2.5, label='Onsets')
+               linewidth=2.5, label='Onsets', color=cmap[2])
     ax2.text(346, 0.035, 'R2 score: {0:.2f}'.format(data['plain']['score']))
     ax2.set_ylabel('Plain word activation')
     ax2.set_xlabel('Time (seconds)')
@@ -151,3 +175,36 @@ def figure_mrt_time_series():
     ax2.spines['left'].set_visible(False)
 
     plt.show()
+
+
+def model_image_create_onsets():
+    """ """
+    general_settings()
+
+    # Offset for text
+    h, v = 0.1 * 20, 0.1
+
+    # Colors
+    cmap = color_palette(3)
+
+    plt.plot([0] * 100, color=cmap[0])
+    plt.vlines([10, 40], 0, 0.5, color=cmap[0])
+    plt.text(10 + h, 0.5 + v, '1', rotation=90)
+    plt.text(40 + h, 0.5 + v, '4', rotation=90)
+    plt.plot([2] * 100, color=cmap[1])
+    plt.vlines([30, 60], 2, 2.5, color=cmap[1])
+    plt.text(30 + h, 2.5 + v, '2', rotation=90)
+    plt.text(60 + h, 2.5 + v, '5', rotation=90)
+    plt.plot([4] * 100, color=cmap[2])
+    plt.vlines([50, 80], 4, 4.5, color=cmap[2])
+    plt.text(50 + h, 4.5 + v, '3', rotation=90)
+    plt.text(80 + h, 4.5 + v, '6', rotation=90)
+    plt.axis('off')
+    plt.ylim(-.1, 5)
+
+    plt.show()
+
+
+def model_image_create_convoluted_onsets():
+    """ """
+    general_settings()

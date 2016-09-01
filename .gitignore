@@ -5,6 +5,7 @@
 *.pickle
 *.nii.gz
 *.npy
+*.xcf
 setup.py
 old_models
 simulations/old

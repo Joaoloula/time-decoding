@@ -1,7 +1,39 @@
 from sklearn.cross_validation import LeavePLabelOut
 from time_decoding.data_reading import read_data_mrt
+from sklearn import linear_model
 import time_decoding.decoding as de
 import numpy as np
+
+
+def logistic_deconvolution(estimation_train, estimation_test, stimuli_train,
+                           stimuli_test, logistic_window):
+    """ Learn a deconvolution filter for classification given a time window
+    using logistic regression """
+    log = linear_model.LogisticRegressionCV()
+    cats_train = [
+        estimation_train[scan: scan + logistic_window].ravel()
+        for scan in xrange(len(estimation_train) - logistic_window + 1)]
+    cats_test = [
+        estimation_test[scan: scan + logistic_window].ravel()
+        for scan in xrange(len(estimation_test) - logistic_window + 1)]
+
+    train_mask = np.sum(
+        stimuli_train[:len(cats_train), 1:], axis=1).astype(bool)
+    test_mask = np.sum(
+        stimuli_test[:len(cats_test), 1:], axis=1).astype(bool)
+
+    stimuli_train, stimuli_test = (
+        np.argmax(stimuli_train[:len(cats_train)][train_mask], axis=1),
+        np.argmax(stimuli_test[:len(cats_test)][test_mask], axis=1))
+    cats_train, cats_test = (
+        np.array(cats_train)[train_mask], np.array(cats_test)[test_mask])
+
+    log.fit(cats_train, stimuli_train)
+    accuracy = log.score(cats_test, stimuli_test)
+    probas = log.predict_proba(cats_test)
+
+    return accuracy, probas
+
 
 # Parameters
 subject_list = [12]
@@ -14,6 +46,7 @@ logistic_window = 4
 
 all_scores = []
 all_predictions = []
+all_probas = []
 for subject in subject_list:
     subject_scores = []
     # Read data
@@ -50,11 +83,12 @@ for subject in subject_list:
         all_predictions.append([design_test, prediction_test, score])
 
         # Fit a logistic regression for deconvolution
-        accuracy = de.logistic_deconvolution(
+        accuracy, probas = logistic_deconvolution(
             prediction_train, prediction_test, stimuli_train[:, 1:],
             stimuli_test[:, 1:], logistic_window)
 
         subject_scores.append(accuracy)
+        all_probas.append(probas)
 
         break
 

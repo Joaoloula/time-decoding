@@ -1,5 +1,5 @@
 from sklearn.feature_selection import SelectKBest, f_classif
-from nistats.design_matrix import make_design_matrix, plot_design_matrix
+from nistats.design_matrix import make_design_matrix
 from sklearn import linear_model, metrics
 import pandas as pd
 import numpy as np
@@ -208,9 +208,9 @@ def design_matrix(n_scans, tr, onsets, conditions, durations=None,
     return X
 
 
-def glm(fmri, onsets, conditions=None, durations=None, hrf_model='spm', drift_model='cosine'):
+def glm(fmri, tr, onsets, conditions=None, durations=None, hrf_model='spm',
+        drift_model='cosine'):
     """ Fit a GLM for comparison with time decoding model """
-    tr = 2.4
     betas = []
     regressors = []
     for session in range(len(fmri)):

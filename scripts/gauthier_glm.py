@@ -6,17 +6,22 @@ import numpy as np
 # Parameters
 subject_list = range(11)
 k = 10000
+tr = 1.5
 
 # GLM parameters
 hrf_model = 'spm'
 
-all_scores = []
+scores = []
+subjects = []
+models = []
+isis = []
 for subject in subject_list:
     subject_scores = []
     # Read data
     fmri, stimuli, onsets, conditions = read_data_gauthier(subject)
     session_id_onset = np.load('sessions_id_onset.npy')
-    betas = de.glm(fmri, onsets, hrf_model=hrf_model, drift_model='blank')
+    betas = de.glm(fmri, tr, onsets, hrf_model=hrf_model,
+                   drift_model='blank')[0]
 
     betas = np.vstack(betas)
     conditions = np.hstack(conditions)
@@ -36,9 +41,19 @@ for subject in subject_list:
         accuracy = de.glm_scoring(betas_train, betas_test, conditions_train,
                                   conditions_test)
 
-        subject_scores.append(accuracy)
+        n_points = len(conditions_test)
+        if n_points == 12:
+            isi = 1.6
 
-    all_scores.append(subject_scores)
+        elif n_points == 6:
+            isi = 3.2
+
+        if n_points == 4:
+            isi = 4.8
+
+        scores.append(accuracy)
+        subjects.append(subject + 1)
+        models.append('logistic deconvolution')
+        isis.append(isi)
 
     print('finished subject ' + str(subject))
-    print(subject_scores)

@@ -4,7 +4,7 @@ import time_decoding.decoding as de
 import numpy as np
 
 # Parameters
-subject_list = range(1)
+subject_list = range(12)
 tr = 1.5
 k = 10000
 
@@ -12,10 +12,8 @@ k = 10000
 hrf_model = 'spm'
 logistic_window = 3
 
-all_scores = []
-all_predictions = []
+scores, subjects, models, isis = [], [], [], []
 for subject in subject_list:
-    subject_scores = []
     # Read data
     fmri, stimuli, onsets, conditions = read_data_gauthier(subject)
     session_id_fmri = [[session] * len(fmri[session])
@@ -47,16 +45,25 @@ for subject in subject_list:
             fmri_train, fmri_test, design_train, design_test,
             double_prediction=True, extra=fmri_train)
 
-        all_predictions.append([design_test, prediction_test, score])
-
         # Fit a logistic regression for deconvolution
         accuracy = de.logistic_deconvolution(
             prediction_train, prediction_test, stimuli_train,
             stimuli_test, logistic_window)
 
-        subject_scores.append(accuracy)
+        n_points = np.sum(stimuli_test[:, 1:])
+        if n_points == 12:
+            isi = 1.6
 
-    all_scores.append(subject_scores)
+        elif n_points == 6:
+            isi = 3.2
+
+        if n_points == 4:
+            isi = 4.8
+
+        print(np.sum(stimuli_test[:, 1:]))
+        scores.append(accuracy)
+        subjects.append(subject + 1)
+        models.append('logistic deconvolution')
+        isis.append(isi)
 
     print('finished subject ' + str(subject))
-    print(subject_scores)

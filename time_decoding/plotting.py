@@ -1,5 +1,6 @@
 from nistats.hemodynamic_models import _hrf_kernel
 from matplotlib import colors
+import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
@@ -278,7 +279,7 @@ def model_image_create_onsets():
     general_settings()
 
     # Offset for text
-    h, v = -0.1 * 20, 0.1
+    h, v = -0.1 * 65, 0.1
 
     # Colors
     cmap = sns.color_palette("colorblind", n_colors=3)
@@ -336,22 +337,55 @@ def model_image_create_convolved_onsets(noise=False):
         conv_onsets3 += np.random.normal(0, .1, 100)
 
     # Offset for text
-    h, v = -0.1 * 20, 0.1
+    h, v = -0.1 * 65, 0.1
 
     # Colors
     cmap = sns.color_palette("colorblind", n_colors=3)
+    tw_color = sns.color_palette("muted", 4)[3]
 
     # Plot
-    plt.plot(conv_onsets1, color=cmap[0], linewidth=width)
-    plt.text(10 + h, 0.5 + v, '1', rotation=90, fontsize=fsize)
-    plt.text(40 + h, 0.5 + v, '4', rotation=90, fontsize=fsize)
-    plt.plot(2 + conv_onsets2, color=cmap[1], linewidth=width)
-    plt.text(30 + h, 2.5 + v, '2', rotation=90, fontsize=fsize)
-    plt.text(60 + h, 2.5 + v, '5', rotation=90, fontsize=fsize)
-    plt.plot(4 + conv_onsets3, color=cmap[2], linewidth=width)
-    plt.text(50 + h, 4.5 + v, '3', rotation=90, fontsize=fsize)
-    plt.text(80 + h, 4.5 + v, '6', rotation=90, fontsize=fsize)
-    plt.axis('off')
+    f, ax = plt.subplots(1)
+    ax.plot(conv_onsets1, color=cmap[0], linewidth=width)
+    ax.text(10 + h, 0.5 + v, '1', rotation=90, fontsize=fsize)
+    ax.text(40 + h, 0.5 + v, '4', rotation=90, fontsize=fsize)
+    ax.plot(2 + conv_onsets2, color=cmap[1], linewidth=width)
+    ax.text(30 + h, 2.5 + v, '2', rotation=90, fontsize=fsize)
+    ax.text(60 + h, 2.5 + v, '5', rotation=90, fontsize=fsize)
+    ax.plot(4 + conv_onsets3, color=cmap[2], linewidth=width)
+    ax.text(50 + h, 4.5 + v, '3', rotation=90, fontsize=fsize)
+    ax.text(80 + h, 4.5 + v, '6', rotation=90, fontsize=fsize)
+    ax.set_ylim(-1.5, 5.5)
+    ax.axis('off')
+
+    # Add time windows visualization on the estimation
+    mult = 1
+    if noise:
+        ax.add_patch(patches.Rectangle((10, -1), 5, 6, fill=False,
+                                       edgecolor=tw_color,
+                                       linewidth=width*mult,
+                                       linestyle='dashed'))
+        ax.add_patch(patches.Rectangle((30, -1), 5, 6, fill=False,
+                                       edgecolor=tw_color,
+                                       linewidth=width*mult,
+                                       linestyle='dashed'))
+        ax.add_patch(patches.Rectangle((40, -1), 5, 6, fill=False,
+                                       edgecolor=tw_color,
+                                       linewidth=width*mult,
+                                       linestyle='dashed'))
+        ax.add_patch(patches.Rectangle((50, -1), 5, 6, fill=False,
+                                       edgecolor=tw_color,
+                                       linewidth=width*mult,
+                                       linestyle='dashed'))
+        ax.add_patch(patches.Rectangle((60, -1), 5, 6, fill=False,
+                                       edgecolor=tw_color,
+                                       linewidth=width*mult,
+                                       linestyle='dashed'))
+        ax.add_patch(patches.Rectangle((80, -1), 5, 6, fill=False,
+                                       edgecolor=tw_color,
+                                       linewidth=width*mult,
+                                       linestyle='dashed'))
+
+    print(ax.patches)
 
     plt.show()
 
@@ -363,41 +397,41 @@ def model_image_estimation_matrix():
 
     # Colors
     cmap = sns.color_palette("colorblind", n_colors=3)
-    h, offset = 0.6, -0.6
+    h, v, offset = 0.5, 8, -0.5
     plt.xlim(offset, 4)
-    plt.ylim(0, 7)
+    plt.ylim(0, 49)
     plt.axis('off')
 
     # Onset texts:
-    plt.text(offset, 6, "1: ", color='k', fontsize=fsize)
-    plt.text(offset, 5, "2: ", color='k', fontsize=fsize)
-    plt.text(offset, 4, "3: ", color='k', fontsize=fsize)
-    plt.text(offset, 3, "4: ", color='k', fontsize=fsize)
-    plt.text(offset, 2, "5: ", color='k', fontsize=fsize)
-    plt.text(offset, 1, "6: ", color='k', fontsize=fsize)
+    plt.text(offset, 6 * v, "1: ", color='k', fontsize=fsize)
+    plt.text(offset, 5 * v, "2: ", color='k', fontsize=fsize)
+    plt.text(offset, 4 * v, "3: ", color='k', fontsize=fsize)
+    plt.text(offset, 3 * v, "4: ", color='k', fontsize=fsize)
+    plt.text(offset, 2 * v, "5: ", color='k', fontsize=fsize)
+    plt.text(offset, 1 * v, "6: ", color='k', fontsize=fsize)
 
     # First column
-    plt.text(0, 6, "0.6", color=cmap[0], fontsize=fsize)
-    plt.text(0, 5, "0.2", color=cmap[0], fontsize=fsize)
-    plt.text(0, 4, "0.1", color=cmap[0], fontsize=fsize)
-    plt.text(0, 3, "0.7", color=cmap[0], fontsize=fsize)
-    plt.text(0, 2, "0.2", color=cmap[0], fontsize=fsize)
-    plt.text(0, 1, "0.3", color=cmap[0], fontsize=fsize)
+    plt.text(0, 6 * v, "0.6", color=cmap[0], fontsize=fsize)
+    plt.text(0, 5 * v, "0.2", color=cmap[0], fontsize=fsize)
+    plt.text(0, 4 * v, "0.1", color=cmap[0], fontsize=fsize)
+    plt.text(0, 3 * v, "0.7", color=cmap[0], fontsize=fsize)
+    plt.text(0, 2 * v, "0.2", color=cmap[0], fontsize=fsize)
+    plt.text(0, 1 * v, "0.3", color=cmap[0], fontsize=fsize)
 
     # Second column
-    plt.text(h, 6, "0.1", color=cmap[1], fontsize=fsize)
-    plt.text(h, 5, "0.7", color=cmap[1], fontsize=fsize)
-    plt.text(h, 4, "0.1", color=cmap[1], fontsize=fsize)
-    plt.text(h, 3, "0.2", color=cmap[1], fontsize=fsize)
-    plt.text(h, 2, "0.6", color=cmap[1], fontsize=fsize)
-    plt.text(h, 1, "0.2", color=cmap[1], fontsize=fsize)
+    plt.text(h, 6 * v, "0.1", color=cmap[1], fontsize=fsize)
+    plt.text(h, 5 * v, "0.7", color=cmap[1], fontsize=fsize)
+    plt.text(h, 4 * v, "0.1", color=cmap[1], fontsize=fsize)
+    plt.text(h, 3 * v, "0.2", color=cmap[1], fontsize=fsize)
+    plt.text(h, 2 * v, "0.6", color=cmap[1], fontsize=fsize)
+    plt.text(h, 1 * v, "0.2", color=cmap[1], fontsize=fsize)
 
     # Third column
-    plt.text(2 * h, 6, "0.3", color=cmap[2], fontsize=fsize)
-    plt.text(2 * h, 5, "0.1", color=cmap[2], fontsize=fsize)
-    plt.text(2 * h, 4, "0.8", color=cmap[2], fontsize=fsize)
-    plt.text(2 * h, 3, "0.1", color=cmap[2], fontsize=fsize)
-    plt.text(2 * h, 2, "0.2", color=cmap[2], fontsize=fsize)
-    plt.text(2 * h, 1, "0.5", color=cmap[2], fontsize=fsize)
+    plt.text(2 * h, 6 * v, "0.3", color=cmap[2], fontsize=fsize)
+    plt.text(2 * h, 5 * v, "0.1", color=cmap[2], fontsize=fsize)
+    plt.text(2 * h, 4 * v, "0.8", color=cmap[2], fontsize=fsize)
+    plt.text(2 * h, 3 * v, "0.1", color=cmap[2], fontsize=fsize)
+    plt.text(2 * h, 2 * v, "0.2", color=cmap[2], fontsize=fsize)
+    plt.text(2 * h, 1 * v, "0.5", color=cmap[2], fontsize=fsize)
 
     plt.show()

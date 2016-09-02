@@ -13,7 +13,7 @@ def general_settings():
         "font.family": "serif",
         "font.serif": ["Times", "Palatino", "serif"]
     })
-    sns.set_context('paper', font_scale=2, rc={"lines.linewidth": 2.5})
+    sns.set_context('paper')
 
 
 def shift_value(rgb, shift):
@@ -186,75 +186,77 @@ def figure_mrt_time_series():
     probas = pickle.load(open('../scripts/plain_mirror_probabilities.pickle',
                               'rb'))
     time = np.arange(100) * 2
+    up = 0.013
+    left = -3
 
     # Plot
-    f, (ax1, ax2) = plt.subplots(2, figsize=(2, 5), sharey=True)
+    f, (ax1, ax2) = plt.subplots(2, figsize=(4, 5), sharey=True)
 
     # Colors
     cmap = sns.color_palette("colorblind", n_colors=4)
+    onset_color = sns.color_palette("muted", 4)[3]
     red_green = sns.color_palette(n_colors=3)
     red, green = red_green[2], red_green[1]
     grey = sns.color_palette("Accent", n_colors=8)[7]
 
     # First subplot
-    ax1.plot(time, data['mirror']['ground-truth'][: 100], linewidth=2.5,
-             label='HRF-convolved onsets', color=cmap[0])
-    ax1.plot(time, data['mirror']['prediction'][: 100], linewidth=2.5,
-             linestyle='--', label='Regularized linear regression estimation',
+    ax1.plot(time, data['mirror']['ground-truth'][: 100],
+             label='Input: HRF-convolved onsets', color=cmap[0])
+    ax1.plot(time, data['mirror']['prediction'][: 100], linestyle='--',
+             dashes=(3, 2), label='Prediction: estimates from brain activity',
              color=cmap[2])
 
     mirror_onsets = np.where(data['mirror']['onsets'][:100])[0] * 2
-    ax1.vlines(mirror_onsets, -0.015, -0.005, linewidth=2.5,  color=cmap[3])
-    """
-    ax1.scatter(mirror_onsets, [-0.01] * len(mirror_onsets), c=cmap[3], s=90,
-                marker='^', edgecolors='face')
-    """
-    ax1.text(180, -0.025, 'mirrored onsets', color=cmap[3])
-    # ax1.text(173, 0.035, 'R2 score: {0:.2f}'.format(data['mirror']['score']))
-    # ax1.set_ylabel('Mirrored')
-    ax1.text(-30, 0, 'Mirrored\ntime-series')
+    ax1.vlines(mirror_onsets, -0.015, -0.005,  color=onset_color)
+    ax1.text(160, -0.025, 'mirror onsets', color=onset_color)
+    ax1.text(-30+left, 0+up, '\'Mirror\'\ncondition\ntime-series',
+             multialignment='center', rotation='vertical')
     ax1.get_xaxis().set_ticks([])
-    ax1.legend(loc=(0, 0.45), ncol=2, fontsize=18)
+    ax1.legend(loc=(0, 0.35), ncol=1)
     ax1.set_xlim(-1, 201)
 
     # Second subplot
-    ax2.plot(time, data['plain']['ground-truth'][: 100], linewidth=2.5,
-             label='HRF-convolved onsets', color=cmap[0])
-    ax2.plot(time, data['plain']['prediction'][: 100], linewidth=2.5,
-             linestyle='--', label='Linear regression estimation',
+    ax2.plot(time, data['plain']['ground-truth'][: 100],
+             label='Input: HRF-convolved onsets', color=cmap[0])
+    ax2.plot(time, data['plain']['prediction'][: 100], linestyle='--',
+             dashes=(3, 2), label='Prediction: estimates from brain activity',
              color=cmap[2])
 
     plain_onsets = np.where(data['plain']['onsets'][:100])[0] * 2
-    ax2.vlines(plain_onsets, 0.04, 0.05, linewidth=2.5, label='Onsets',
-               color=cmap[3])
-    """
-    ax2.scatter(plain_onsets, [0.04] * len(plain_onsets), c=cmap[3], s=90,
-                marker='v', edgecolors='face')
-    """
-    ax2.text(180, 0.055, 'plain onsets', color=cmap[3])
-    # ax2.text(173, -0.015, 'R2 score: {0:.2f}'.format(data['plain']['score']))
-    # ax2.set_ylabel('Plain')
-    ax2.text(-30, 0, 'Plain\ntime-series')
-    ax2.set_xlabel('Time (seconds)', fontsize=18)
+    ax2.vlines(plain_onsets, 0.04, 0.05, label='Onsets',
+               color=onset_color)
+    ax2.text(160, 0.055, 'plain onsets', color=onset_color)
+    ax2.text(-30+left, 0+up, '\'Plain\'\ncondition\ntime-series',
+             rotation='vertical', multialignment='center')
+    ax2.set_xlabel('Time (seconds)')
     ax2.yaxis.set_ticklabels([])
     ax2.set_xlim(-1, 201)
 
     # Drawing probabilities
-    baseline = 0.1
-    ax2.text(-30, baseline, 'Prediction\nprobability')
-    ax2.text(-30, baseline - 0.01, '(        /          )')
-    ax2.text(-28.8, baseline - 0.01, 'right', color=green)
-    ax2.text(-18.5, baseline - 0.01, 'wrong', color=red)
-    ax2.plot(np.arange(-1, 190), [baseline] * 191, linewidth=1.5, color=grey)
-    ax2.text(191, baseline-0.002, '50%/50%', color=grey)
+    baseline = 0.115
+    ax2.text(-30+left, baseline+up, 'Predicted\nprobability',
+             rotation='vertical', multialignment='center')
+    ax2.text(-10+left, baseline+0.02+up, '(        /          )',
+             rotation='vertical')
+    ax2.text(-10+left, baseline-0.0265+up, 'right', color=green,
+             rotation='vertical')
+    ax2.text(-10+left, baseline+0.0165+up, 'wrong', color=red,
+             rotation='vertical')
+    ax2.plot(np.arange(-1, 190), [baseline] * 191, color=grey)
+    ax2.plot(np.arange(-1, 190), [baseline + 0.02] * 191,
+             linestyle='--', color=grey)
+    ax2.plot(np.arange(-1, 190), [baseline - 0.02] * 191,
+             linestyle='--', color=grey)
+    ax2.text(191, baseline+0.017, 'Mirror', color=grey)
+    ax2.text(191, baseline-0.023, 'Plain', color=grey)
     for index, time in enumerate(plain_onsets):
         prob = (probas['plain probabilities'][index] - 0.5) * 0.04
         color = red if prob < 0 else green
-        ax2.vlines(time, baseline, baseline - prob, color=color, linewidth=7.5)
+        ax2.vlines(time, baseline, baseline - prob, color=color, linewidth=3.5)
     for index, time in enumerate(mirror_onsets):
         prob = (probas['mirror probabilities'][index] - 0.5) * 0.04
         color = red if prob < 0 else green
-        ax2.vlines(time, baseline, baseline + prob, color=color, linewidth=7.5)
+        ax2.vlines(time, baseline, baseline + prob, color=color, linewidth=3.5)
 
     # Remove frames
     ax1.spines['top'].set_visible(False)
@@ -265,6 +267,8 @@ def figure_mrt_time_series():
     ax2.spines['right'].set_visible(False)
     ax2.spines['left'].set_visible(False)
     ax2.spines['bottom'].set_visible(False)
+
+    plt.savefig('mrt_time_series_version3.png')
 
     plt.show()
 

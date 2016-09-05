@@ -1,12 +1,13 @@
 from sklearn.cross_validation import LeavePLabelOut
 from time_decoding.data_reading import read_data_gauthier
-import time_decoding.decoding as de
+import time_decoding as de
 import numpy as np
 
 # Parameters
 subject_list = range(11)
 k = 10000
 tr = 1.5
+model = 'GLMs'
 
 # GLM parameters
 hrf_model = 'spm'
@@ -20,8 +21,8 @@ for subject in subject_list:
     # Read data
     fmri, stimuli, onsets, conditions = read_data_gauthier(subject)
     session_id_onset = np.load('sessions_id_onset.npy')
-    betas = de.glm(fmri, tr, onsets, hrf_model=hrf_model,
-                   drift_model='blank')[0]
+    betas, _ = de.glm(fmri, tr, onsets, hrf_model=hrf_model,
+                      drift_model='blank', model=model)
 
     betas = np.vstack(betas)
     conditions = np.hstack(conditions)
@@ -53,7 +54,7 @@ for subject in subject_list:
 
         scores.append(accuracy)
         subjects.append(subject + 1)
-        models.append('logistic deconvolution')
+        models.append(model)
         isis.append(isi)
 
     print('finished subject ' + str(subject))

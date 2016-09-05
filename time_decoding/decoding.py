@@ -25,7 +25,7 @@ def apply_time_window(fmri_train, fmri_test, stimuli_train, stimuli_test,
     Applies a time window to a given experiment, extending the fmri to contain
     voxel activations of all scans in that window at each time step, and
     adjusting the time series and session identifiers accordingly. Also adjusts
-    for the delay in the Haxby dataset.
+    for a given delay in the embedding, and performs feature selection.
 
     Parameters
     ----------
@@ -139,24 +139,17 @@ def fit_ridge(fmri_train, fmri_test, one_hot_train, one_hot_test,
     return prediction, score
 
 
-def classification_score(prediction, stimuli, mode='regression'):
+def ridge_scoring(prediction, stimuli):
     """ Returns a classification score from a regressor by doing a softmax """
     # Restrain analysis to scans with stimuli (i.e. no 'rest' category)
-    if mode == 'regression':
-        mask = np.sum(stimuli[:, 1: -1], axis=1).astype(bool)
-        prediction, stimuli = np.array((prediction[mask][:, 1: -1],
-                                        stimuli[mask][:, 1: -1]))
+    mask = np.sum(stimuli[:, 1:], axis=1).astype(bool)
+    prediction, stimuli = np.array((prediction[mask][:, 1:],
+                                    stimuli[mask][:, 1:]))
 
-    elif mode == 'glm':
-        mask = np.sum(stimuli[:, 1: -1], axis=1).astype(bool)
-        # Flip prediction to correspond to stimuli
-        prediction, stimuli = np.array((np.fliplr(prediction[mask][:, 1:]),
-                                       stimuli[mask][:, 1: -1]))
-
-    classifier = np.array([[1, 0]
-                           if prediction[scan][0] > prediction[scan][1]
-                           else [0, 1]
-                           for scan in range(prediction.shape[0])])
+    classifier = np.zeros_like(stimuli)
+    for stim in range(len(classifier)):
+        predicted_class = np.argmax(prediction[stim])
+        classifier[stim][predicted_class] = 1
 
     score = metrics.accuracy_score(stimuli, classifier)
 
@@ -209,7 +202,7 @@ def design_matrix(n_scans, tr, onsets, conditions, durations=None,
 
 
 def glm(fmri, tr, onsets, conditions=None, durations=None, hrf_model='spm',
-        drift_model='cosine'):
+        drift_model='cosine', model='GLM'):
     """ Fit a GLM for comparison with time decoding model """
     betas = []
     regressors = []
@@ -221,7 +214,19 @@ def glm(fmri, tr, onsets, conditions=None, durations=None, hrf_model='spm',
             separate_conditions = np.arange(len(onsets[session]))
         X = design_matrix(n_scans, tr, onsets[session], separate_conditions,
                           drift_model=drift_model)
-        session_betas = np.dot(np.linalg.pinv(X), fmri[session])
+        if model == 'GLMs':
+            session_betas = []
+            design_sum = np.sum(X, axis=1)
+            for condition in range(len(separate_conditions)):
+                separate_X = np.array([X[condition]],
+                                      design_sum - X[condition]).T
+                separate_beta = np.dot(np.linalg.pinv(separate_X),
+                                       fmri[session]).reshape(-1)
+                session_betas.append(separate_beta)
+
+        else:
+            session_betas = np.dot(np.linalg.pinv(X), fmri[session])
+
         betas.append(session_betas)
         regressors.append(X.columns)
 

@@ -93,13 +93,28 @@ def make_dataframe(score_list, model_list):
     return data
 
 
-def score_barplot(data):
+def gauthier_barplot():
     """ """
-    plt.style.use('ggplot')
-    sns.set_context('talk', font_scale=1.5)
-    ax = sns.boxplot(x='model', y='accuracy', data=data, orient='h')
-    ax.set_title('Classification accuracies for GLM and time-domain decoding')
-    ax.set_ylim(0.5, 1)
+    general_settings()
+    plt.figure(figsize=(4, 6))
+
+    # Load data
+    data = pickle.load(open('../scripts/gauthier_all_2p_dataframe.pickle',
+                            'rb'))
+
+    # Colors
+    cmap = sns.color_palette("colorblind", n_colors=3)
+
+    # Plot
+    ax = sns.boxplot(x='model', y='accuracy', hue='isi', data=data,
+                     palette=cmap)
+    sns.swarmplot(x='model', y='accuracy', hue='isi', data=data, palette=cmap,
+                  split=True)
+    x_ticks = ['GLM', 'GLMs', 'Time-delayed\nembedding',
+               'Logistic\ndeconvolution']
+    ax.set_xticklabels(x_ticks)
+
+    plt.savefig('gauthier_boxplot_strip.png')
 
     plt.show()
 
@@ -126,55 +141,6 @@ def data_mrt_time_series(all_predictions_session, stimuli_session):
     dict['mirror'] = mirror
 
     pickle.dump(dict, open('data_figure_mrt_time_series.pickle', 'wb'))
-
-
-def figure_one_mrt_time_series():
-    """ Create figure comparing ground-truth and predicted time-series for one
-    class in mirror-reversed text"""
-    general_settings()
-
-    # Load data
-    data = pickle.load(open('data_figure_mrt_time_series.pickle', 'rb'))
-    probas = pickle.load(open('../scripts/plain_mirror_probabilities.pickle',
-                              'rb'))
-    time = np.arange(100) * 2
-
-    # Plot
-    f, ax = plt.subplots(1, figsize=(2, 3))
-
-    # Colors
-    cmap = sns.color_palette("Set1", n_colors=7)
-    red_green = sns.color_palette(n_colors=3)
-    red, green = red_green[2], red_green[1]
-    grey = sns.color_palette("Accent", n_colors=8)[7]
-
-    # Second subplot
-    ax.plot(time, data['plain']['ground-truth'][: 100], linewidth=2.5,
-            label='HRF-convolved onsets', color=cmap[1])
-    ax.plot(time, data['plain']['prediction'][: 100], linewidth=2.5,
-            linestyle='--', label='Prediction', color=cmap[4])
-    onsets = np.where(data['plain']['onsets'][:100])[0] * 2
-    ax.vlines(onsets, -0.01, -0.005, linewidth=2.5, color=grey)
-    for index, time in enumerate(onsets):
-        prob = probas['plain probabilities'][index]
-        color = red if prob < 0.5 else green
-        ax.text(time - 1.7, -0.012, '{0:.2f}'.format(prob)[2:], color=color,
-                size=16)
-
-    ax.text(190, -0.0065, 'Onsets', color=grey)
-    ax.text(173, 0.035, 'R2 score: {0:.2f}'.format(data['plain']['score']))
-    ax.set_xlabel('Time (seconds)')
-    ax.yaxis.set_ticklabels([])
-    ax.legend(loc='upper left', ncol=2)
-    ax.set_ylim(-0.025, 0.05)
-    ax.set_xlim(-1, 201)
-
-    # Remove frames
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_visible(False)
-
-    plt.show()
 
 
 def figure_mrt_time_series():

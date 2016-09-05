@@ -1,54 +1,20 @@
 from sklearn.cross_validation import LeavePLabelOut
 from time_decoding.data_reading import read_data_mrt
-from sklearn import linear_model
 import time_decoding.decoding as de
 import numpy as np
 
-
-def logistic_deconvolution(estimation_train, estimation_test, stimuli_train,
-                           stimuli_test, logistic_window):
-    """ Learn a deconvolution filter for classification given a time window
-    using logistic regression """
-    log = linear_model.LogisticRegressionCV()
-    cats_train = [
-        estimation_train[scan: scan + logistic_window].ravel()
-        for scan in xrange(len(estimation_train) - logistic_window + 1)]
-    cats_test = [
-        estimation_test[scan: scan + logistic_window].ravel()
-        for scan in xrange(len(estimation_test) - logistic_window + 1)]
-
-    train_mask = np.sum(
-        stimuli_train[:len(cats_train), 1:], axis=1).astype(bool)
-    test_mask = np.sum(
-        stimuli_test[:len(cats_test), 1:], axis=1).astype(bool)
-
-    stimuli_train, stimuli_test = (
-        np.argmax(stimuli_train[:len(cats_train)][train_mask], axis=1),
-        np.argmax(stimuli_test[:len(cats_test)][test_mask], axis=1))
-    cats_train, cats_test = (
-        np.array(cats_train)[train_mask], np.array(cats_test)[test_mask])
-
-    log.fit(cats_train, stimuli_train)
-    accuracy = log.score(cats_test, stimuli_test)
-    probas = log.predict_proba(cats_test)
-
-    return accuracy, probas
-
-
 # Parameters
-subject_list = [12]
+subject_list = np.arange(14)
 tr = 2.
 k = 10000
 
 # GLM parameters
 hrf_model = 'spm'
-logistic_window = 4
+logistic_window = 3
+delay = 3
 
-all_scores = []
-all_predictions = []
-all_probas = []
+scores, subjects, models = [], [], []
 for subject in subject_list:
-    subject_scores = []
     # Read data
     fmri, stimuli, onsets, conditions = read_data_mrt(subject)
     session_id_fmri = [[session] * len(fmri[session])
@@ -64,7 +30,7 @@ for subject in subject_list:
     stimuli = np.vstack(stimuli)
     session_id_fmri = np.hstack(session_id_fmri)
 
-    lplo = LeavePLabelOut(session_id_fmri, p=1)
+    lplo = LeavePLabelOut(session_id_fmri, p=2)
     for train_index, test_index in lplo:
         # Split into train and test sets
         fmri_train, fmri_test = fmri[train_index], fmri[test_index]
@@ -80,19 +46,13 @@ for subject in subject_list:
             fmri_train, fmri_test, design_train, design_test,
             double_prediction=True, extra=fmri_train)
 
-        all_predictions.append([design_test, prediction_test, score])
-
         # Fit a logistic regression for deconvolution
-        accuracy, probas = logistic_deconvolution(
+        accuracy = de.logistic_deconvolution(
             prediction_train, prediction_test, stimuli_train[:, 1:],
-            stimuli_test[:, 1:], logistic_window)
+            stimuli_test[:, 1:], logistic_window, delay=delay)
 
-        subject_scores.append(accuracy)
-        all_probas.append(probas)
-
-        break
-
-    all_scores.append(subject_scores)
+        scores.append(accuracy)
+        subjects.append(subject + 1)
+        models.append('logistic deconvolution')
 
     print('finished subject ' + str(subject))
-    print(subject_scores)

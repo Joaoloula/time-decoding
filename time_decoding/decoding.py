@@ -157,10 +157,17 @@ def ridge_scoring(prediction, stimuli):
 
 
 def logistic_deconvolution(estimation_train, estimation_test, stimuli_train,
-                           stimuli_test, logistic_window):
+                           stimuli_test, logistic_window, delay=0):
     """ Learn a deconvolution filter for classification given a time window
     using logistic regression """
     log = linear_model.LogisticRegressionCV()
+
+    if delay != 0:
+        estimation_train, estimation_test = (estimation_train[delay:],
+                                             estimation_test[delay:])
+        stimuli_train, stimuli_test = (stimuli_train[:-delay],
+                                       stimuli_test[:-delay])
+
     cats_train = [
         estimation_train[scan: scan + logistic_window].ravel()
         for scan in xrange(len(estimation_train) - logistic_window + 1)]

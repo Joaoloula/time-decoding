@@ -4,10 +4,10 @@ import time_decoding.decoding as de
 import numpy as np
 
 # Parameters
-subject_list = range(14)
+subject_list = np.arange(14)
 k = 10000
 tr = 2.
-model = 'GLM'
+model = 'GLMs'
 
 # GLM parameters
 hrf_model = 'spm'
@@ -16,16 +16,26 @@ scores, subjects, models = [], [], []
 for subject in subject_list:
     # Read data
     fmri, stimuli, onsets, conditions = read_data_mrt(subject)
-    session_id_onset = [[session] * len(onsets[session])
-                        for session in range(len(onsets))]
-    betas, _ = de.glm(fmri, tr, onsets, hrf_model=hrf_model,
-                      drift_model='blank', model=model)
+    betas, reg = de.glm(fmri, tr, onsets, hrf_model=hrf_model, model=model)
+    reg = np.array([np.array(session) for session in reg])
 
-    betas = np.vstack(betas)
+    new_betas = []
+    session_id_onset = []
+    for session in range(len(reg)):
+        for onset in range(len(reg[session])):
+            if reg[session][onset] <= 1000:
+                new_betas.append(betas[session][onset])
+                session_id_onset.append(session)
+    betas = np.array(new_betas)
+    session_id_onset = np.array(session_id_onset)
     conditions = np.hstack(conditions)
-    session_id_onset = np.hstack(session_id_onset)
 
-    lplo = LeavePLabelOut(session_id_onset, p=2)
+    junk_mask = np.where(conditions != 'ju')
+    conditions = conditions[junk_mask]
+    betas = betas[junk_mask]
+    session_id_onset = session_id_onset[junk_mask]
+
+    lplo = LeavePLabelOut(session_id_onset, p=1)
     for train_index, test_index in lplo:
         # Split into train and test sets
         betas_train, betas_test = betas[train_index], betas[test_index]

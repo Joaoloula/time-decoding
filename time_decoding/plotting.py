@@ -14,7 +14,7 @@ def general_settings():
         "font.family": "serif",
         "font.serif": ["Times", "Palatino", "serif"]
     })
-    sns.set_context('paper')
+    sns.set_context('paper', font_scale=2)
 
 
 def shift_value(rgb, shift):
@@ -115,6 +115,34 @@ def gauthier_barplot():
     ax.set_xticklabels(x_ticks)
 
     plt.savefig('gauthier_boxplot_strip.png')
+
+    plt.show()
+
+
+def all_boxplot():
+    """ """
+    general_settings()
+    plt.figure(figsize=(4, 6))
+
+    # Load data
+    data = pickle.load(open('../scripts/mrt_gauthier_all_dataframe.pickle',
+                            'rb'))
+
+    # Colors
+    cmap = sns.color_palette("colorblind", n_colors=3)
+    cmap.append(sns.color_palette("muted", 4)[3])
+
+    # Plot
+    ax = sns.boxplot(x='accuracy', y='dataset', hue='model', data=data,
+                     palette=cmap, orient='h')
+    """
+    sns.swarmplot(x='accuracy', y='model', hue='dataset', data=data,
+                  palette=cmap, split=True)
+    """
+    y_ticks = ['Mirror-\nreversed\nText', 'Temporal\nTuning']
+    ax.set_yticklabels(y_ticks)
+
+    plt.savefig('all_boxplot_strip.png')
 
     plt.show()
 

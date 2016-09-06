@@ -21,11 +21,13 @@ for subject in subject_list:
     # Read data
     fmri, stimuli, onsets, conditions = read_data_gauthier(subject)
     session_id_onset = np.load('sessions_id_onset.npy')
-    betas, _ = de.glm(fmri, tr, onsets, hrf_model=hrf_model,
-                      drift_model='blank', model=model)
+    betas, reg = de.glm(fmri, tr, onsets, hrf_model=hrf_model,
+                        drift_model='blank', model=model)
 
     betas = np.vstack(betas)
     conditions = np.hstack(conditions)
+
+    break
 
     lplo = LeavePLabelOut(session_id_onset, p=2)
     for train_index, test_index in lplo:

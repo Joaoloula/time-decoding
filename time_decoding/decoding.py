@@ -228,14 +228,14 @@ def glm(fmri, tr, onsets, conditions=None, durations=None, hrf_model='spm',
                 separate_X = np.array([X[condition]],
                                       design_sum - X[condition]).T
                 separate_beta = np.dot(np.linalg.pinv(separate_X),
-                                       fmri[session]).reshape(-1)
+                                       fmri[session])[0]
                 session_betas.append(separate_beta)
 
         else:
             session_betas = np.dot(np.linalg.pinv(X), fmri[session])
 
-        betas.append(session_betas)
-        regressors.append(X.columns)
+        betas.append(session_betas[:len(separate_conditions)])
+        regressors.append(X.columns[:len(separate_conditions)])
 
     betas = np.array(betas)
     regressors = np.array(regressors)

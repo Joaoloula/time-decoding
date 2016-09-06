@@ -4,18 +4,21 @@ import time_decoding.decoding as de
 import numpy as np
 
 # Parameters
-subject_list = range(1)
+subject_list = range(7)
 k = 10000
+tr = 2.4
 
 # GLM parameters
 hrf_model = 'spm'
+model = 'GLMs'
 
-all_scores = []
+scores, models, subjects = [], [], []
 for subject in subject_list:
     subject_scores = []
     # Read data
     fmri, stimuli, onsets, conditions = read_data_texture(subject)
-    betas, regressors = de.glm(fmri, onsets, conditions, hrf_model=hrf_model)
+    betas, regressors = de.glm(fmri, tr, onsets, conditions,
+                               hrf_model=hrf_model, model=model)
     session_id_onset = np.array([[session] * len(betas[0])
                                  for session in range(len(onsets))]).ravel()
     betas = np.vstack(betas)
@@ -47,10 +50,10 @@ for subject in subject_list:
         accuracy = de.glm_scoring(betas_train, betas_test, conditions_train,
                                   conditions_test)
 
-        subject_scores.append(accuracy)
+        scores.append(accuracy)
+        subjects.append(subject)
+        models.append(model)
         print('finished one CV step')
-
-    all_scores.append(subject_scores)
 
     print('finished subject ' + str(subject))
     print(subject_scores)

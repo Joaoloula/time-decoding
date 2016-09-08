@@ -1,6 +1,6 @@
 from sklearn.cross_validation import LeavePLabelOut
 from time_decoding.data_reading import read_data_gauthier
-import decoding as de
+import time_decoding.decoding as de
 import numpy as np
 
 # Parameters
@@ -10,8 +10,8 @@ k = 10000
 
 # GLM parameters
 hrf_model = 'spm'
-logistic_window = 3
-delay = 2
+logistic_window = 5
+delay = 0
 
 scores, subjects, models, isis = [], [], [], []
 for subject in subject_list:
@@ -19,6 +19,8 @@ for subject in subject_list:
     fmri, stimuli, onsets, conditions = read_data_gauthier(subject)
     session_id_fmri = [[session] * len(fmri[session])
                        for session in range(len(fmri))]
+    session_id_fmri = [[19.2 / len(onsets[session])] * len(fmri[session])
+                       for session in range(len(onsets))]
     design = [de.design_matrix(len(fmri[session]), tr, onsets[session],
                                conditions[session], hrf_model=hrf_model,
                                drift_model='blank')
@@ -30,7 +32,7 @@ for subject in subject_list:
     stimuli = np.vstack(stimuli)
     session_id_fmri = np.hstack(session_id_fmri)
 
-    lplo = LeavePLabelOut(session_id_fmri, p=2)
+    lplo = LeavePLabelOut(session_id_fmri, p=1)
     for train_index, test_index in lplo:
         # Split into train and test sets
         fmri_train, fmri_test = fmri[train_index], fmri[test_index]
@@ -38,14 +40,20 @@ for subject in subject_list:
         stimuli_train, stimuli_test = stimuli[train_index], stimuli[test_index]
 
         n_points = np.sum(stimuli_test[:, 1:])
-        if n_points == 12 * 2:
+        if n_points == 12 * 4:
             isi = 1.6
+            logistic_window = 1
+            delay = 3
 
-        elif n_points == 6 * 2:
+        elif n_points == 6 * 4:
             isi = 3.2
+            logistic_window = 2
+            delay = 3
 
-        elif n_points == 4 * 2:
+        elif n_points == 4 * 4:
             isi = 4.8
+            logistic_window = 3
+            delay = 3
 
         else:
             continue

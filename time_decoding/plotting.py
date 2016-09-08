@@ -14,7 +14,7 @@ def general_settings():
         "font.family": "serif",
         "font.serif": ["Times", "Palatino", "serif"]
     })
-    sns.set_context('paper', font_scale=2)
+    sns.set_context('paper')
 
 
 def shift_value(rgb, shift):
@@ -99,20 +99,24 @@ def gauthier_barplot():
     plt.figure(figsize=(4, 6))
 
     # Load data
-    data = pickle.load(open('../scripts/gauthier_all_2p_dataframe.pickle',
+    data = pickle.load(open('../scripts/gauthier_all+tde_dataframe.pickle',
                             'rb'))
 
     # Colors
     cmap = sns.color_palette("colorblind", n_colors=3)
 
     # Plot
-    ax = sns.boxplot(x='model', y='accuracy', hue='isi', data=data,
-                     palette=cmap)
+    ax = sns.barplot(x='model', y='accuracy', hue='isi', data=data,
+                     order=['GLM', 'GLMs', 'time-delayed embedding',
+                            'logistic deconvolution'], palette=cmap)
+    """
     sns.swarmplot(x='model', y='accuracy', hue='isi', data=data, palette=cmap,
                   split=True)
+    """
     x_ticks = ['GLM', 'GLMs', 'Time-delayed\nembedding',
                'Logistic\ndeconvolution']
     ax.set_xticklabels(x_ticks)
+    ax.set_ylim(0.4, 0.8)
 
     plt.savefig('gauthier_boxplot_strip.png')
 

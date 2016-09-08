@@ -5,9 +5,9 @@ import numpy as np
 
 # Parameters
 subject_list = range(11)
-k = 10000
 tr = 1.5
-model = '2GLMs'
+k = 10000
+model = 'GLM'
 
 # GLM parameters
 hrf_model = 'spm'
@@ -29,11 +29,10 @@ for subject in subject_list:
     lplo = LeavePLabelOut(session_id_onset, p=1)
     for train_index, test_index in lplo:
         # Split into train and test sets
-        betas_train, betas_test = betas[train_index], betas[test_index]
-        conditions_train, conditions_test = (conditions[train_index],
-                                             conditions[test_index])
+        betas_isi = betas[test_index]
+        conditions_isi = conditions[test_index]
 
-        n_points = len(conditions_test)
+        n_points = len(conditions_isi)
         if n_points == 12 * 4:
             isi = 1.6
 
@@ -46,17 +45,24 @@ for subject in subject_list:
         else:
             continue
 
-        # Feature selection
-        betas_train, betas_test = de.feature_selection(betas_train, betas_test,
-                                                       conditions_train, k=k)
+        labels = np.hstack([[session] * int(19.2/isi) for session in range(4)])
+        lplo2 = LeavePLabelOut(labels, p=2)
+        for train_id, test_id in lplo2:
+            betas_train, betas_test = betas_isi[train_id], betas_isi[test_id]
+            conditions_train, conditions_test = (conditions_isi[train_id],
+                                                 conditions_isi[test_id])
 
-        # Fit a logistic regression to score the model
-        accuracy = de.glm_scoring(betas_train, betas_test, conditions_train,
-                                  conditions_test)
+            # Feature selection
+            betas_train, betas_test = de.feature_selection(
+                betas_train, betas_test, conditions_train, k=k)
 
-        scores.append(accuracy)
-        subjects.append(subject + 1)
-        models.append(model)
-        isis.append(isi)
+            # Fit a logistic regression to score the model
+            accuracy = de.glm_scoring(betas_train, betas_test, conditions_train,
+                                      conditions_test)
+
+            scores.append(accuracy)
+            subjects.append(subject + 1)
+            models.append(model)
+            isis.append(isi)
 
     print('finished subject ' + str(subject))

@@ -4,14 +4,14 @@ import decoding as de
 import numpy as np
 
 # Parameters
-subject_list = range(11)
+subject_list = np.arange(11)
 tr = 1.5
 k = 10000
 
 # GLM parameters
 hrf_model = 'spm'
-logistic_window = 3
-delay = 2
+logistic_window = 4
+delay = 1
 
 scores, subjects, models, isis = [], [], [], []
 for subject in subject_list:

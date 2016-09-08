@@ -55,12 +55,6 @@ def apply_time_window(fmri_train, fmri_test, stimuli_train, stimuli_test,
         stimuli_train, stimuli_test = (stimuli_train[:-delay],
                                        stimuli_test[:-delay])
 
-    # Fit the anova feature selection
-    stimuli_train_1d = np.argmax(stimuli_train, axis=1)
-    anova = SelectKBest(f_classif, k=k)
-    fmri_train = anova.fit_transform(fmri_train, stimuli_train_1d)
-    fmri_test = anova.transform(fmri_test)
-
     n_scans_train, n_scans_test = fmri_train.shape[0], fmri_test.shape[0]
 
     fmri_train = [fmri_train[scan: scan + time_window].ravel()
@@ -71,6 +65,12 @@ def apply_time_window(fmri_train, fmri_test, stimuli_train, stimuli_test,
     if time_window != 1:
         stimuli_train, stimuli_test = (stimuli_train[: -(time_window - 1)],
                                        stimuli_test[: -(time_window - 1)])
+
+    # Fit the anova feature selection
+    stimuli_train_1d = np.argmax(stimuli_train, axis=1)
+    anova = SelectKBest(f_classif, k=k)
+    fmri_train = anova.fit_transform(fmri_train, stimuli_train_1d)
+    fmri_test = anova.transform(fmri_test)
 
     return fmri_train, fmri_test, stimuli_train, stimuli_test
 
@@ -224,9 +224,29 @@ def glm(fmri, tr, onsets, conditions=None, durations=None, hrf_model='spm',
         if model == 'GLMs':
             session_betas = []
             design_sum = np.sum(X, axis=1)
-            for condition in range(len(separate_conditions)):
-                separate_X = np.array([X[condition]],
-                                      design_sum - X[condition]).T
+            for condition in np.unique(separate_conditions):
+                separate_X = np.array([X[condition],
+                                      design_sum - X[condition]]).T
+                separate_beta = np.dot(np.linalg.pinv(separate_X),
+                                       fmri[session])[0]
+                session_betas.append(separate_beta)
+
+        elif model == '2GLMs':
+            session_betas = []
+            face_id = np.arange(len(separate_conditions))[::2]
+            house_id = np.arange(len(separate_conditions))[1::2]
+            face_sum = np.sum(X[face_id], axis=1)
+            house_sum = np.sum(X[house_id], axis=1)
+            for condition in np.unique(separate_conditions):
+                if condition % 2 == 0:
+                    separate_X = np.array([X[condition],
+                                           face_sum,
+                                           house_sum - X[condition]]).T
+                else:
+                    separate_X = np.array([X[condition],
+                                           face_sum - X[condition],
+                                           house_sum]).T
+
                 separate_beta = np.dot(np.linalg.pinv(separate_X),
                                        fmri[session])[0]
                 session_betas.append(separate_beta)
@@ -234,8 +254,8 @@ def glm(fmri, tr, onsets, conditions=None, durations=None, hrf_model='spm',
         else:
             session_betas = np.dot(np.linalg.pinv(X), fmri[session])
 
-        betas.append(session_betas[:len(separate_conditions)])
-        regressors.append(X.columns[:len(separate_conditions)])
+        betas.append(session_betas[:len(np.unique(separate_conditions))])
+        regressors.append(X.columns[:len(np.unique(separate_conditions))])
 
     betas = np.array(betas)
     regressors = np.array(regressors)

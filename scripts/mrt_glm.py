@@ -7,7 +7,7 @@ import numpy as np
 subject_list = np.arange(14)
 k = 10000
 tr = 2.
-model = 'GLMs'
+model = 'GLM'
 
 # GLM parameters
 hrf_model = 'spm'
@@ -16,18 +16,12 @@ scores, subjects, models = [], [], []
 for subject in subject_list:
     # Read data
     fmri, stimuli, onsets, conditions = read_data_mrt(subject)
+    session_id_onset = [[session] * len(onsets[session])
+                        for session in range(len(onsets))]
     betas, reg = de.glm(fmri, tr, onsets, hrf_model=hrf_model, model=model)
-    reg = np.array([np.array(session) for session in reg])
 
-    new_betas = []
-    session_id_onset = []
-    for session in range(len(reg)):
-        for onset in range(len(reg[session])):
-            if reg[session][onset] <= 1000:
-                new_betas.append(betas[session][onset])
-                session_id_onset.append(session)
-    betas = np.array(new_betas)
-    session_id_onset = np.array(session_id_onset)
+    betas = np.vstack(betas)
+    session_id_onset = np.hstack(session_id_onset)
     conditions = np.hstack(conditions)
 
     junk_mask = np.where(conditions != 'ju')

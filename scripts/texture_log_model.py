@@ -5,12 +5,13 @@ import numpy as np
 
 # Parameters
 subject_list = range(1)
-tr = 1.5
+tr = 2.4
 k = 10000
 
 # GLM parameters
 hrf_model = 'spm'
-logistic_window = 3
+logistic_window = 4
+delay = 0
 
 all_scores = []
 all_predictions = []
@@ -18,10 +19,12 @@ for subject in subject_list:
     subject_scores = []
     # Read data
     fmri, stimuli, onsets, conditions = read_data_texture(subject)
+    conditions_ = [[condition[:2] for condition in session]
+                   for session in conditions]
     session_id_fmri = [[session] * len(fmri[session])
                        for session in range(len(fmri))]
     design = [de.design_matrix(len(fmri[session]), tr, onsets[session],
-                               conditions[session], hrf_model=hrf_model)
+                               conditions_[session], hrf_model=hrf_model)
               for session in range(len(fmri))]
 
     # Stack the BOLD signals and the design matrices
@@ -50,8 +53,8 @@ for subject in subject_list:
 
         # Fit a logistic regression for deconvolution
         accuracy = de.logistic_deconvolution(
-            prediction_train, prediction_test, stimuli_train[:-1],
-            stimuli_test[:-1], logistic_window)
+            prediction_train, prediction_test, stimuli_train[:, :-1],
+            stimuli_test[:, :-1], logistic_window, delay=delay)
 
         subject_scores.append(accuracy)
 

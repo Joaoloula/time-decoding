@@ -1,8 +1,10 @@
 from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.ensemble import RandomForestClassifier
 from nistats.design_matrix import make_design_matrix
 from sklearn import linear_model, metrics
 import pandas as pd
 import numpy as np
+import itertools
 
 
 def feature_selection(fmri_train, fmri_test, stimuli_train, k=10000):
@@ -157,7 +159,9 @@ def ridge_scoring(prediction, stimuli):
 
 
 def logistic_deconvolution(estimation_train, estimation_test, stimuli_train,
-                           stimuli_test, logistic_window, delay=0):
+                           stimuli_test, logistic_window, delay=0,
+                           balance=False, n_tests=20, block=None,
+                           session_id_onset=None):
     """ Learn a deconvolution filter for classification given a time window
     using logistic regression """
     log = linear_model.LogisticRegressionCV()
@@ -186,8 +190,88 @@ def logistic_deconvolution(estimation_train, estimation_test, stimuli_train,
     cats_train, cats_test = (
         np.array(cats_train)[train_mask], np.array(cats_test)[test_mask])
 
-    log.fit(cats_train, stimuli_train)
-    accuracy = log.score(cats_test, stimuli_test)
+    # Balance classes in train set
+    isi_id = [round(19.2 / len(np.where(session_id_onset == trial)[0]), 2)
+              for trial in range(12)]
+
+    if balance:
+        accuracy = 0
+        isi_id = np.delete(isi_id, block)
+        onsets = np.delete(session_id_onset,
+                           np.union1d(np.where(session_id_onset == block[0])[0],
+                                      np.where(session_id_onset == block[1])[0])
+                           )
+        combinations_face = np.asarray([
+            [item for item in
+             itertools.combinations(np.where(onsets == trial)[0][::2], 2)]
+            for trial in range(12) if (trial not in block)])
+        combinations_house = np.asarray([
+            [item for item in
+             itertools.combinations(np.where(onsets == trial)[0][1::2], 2)]
+            for trial in range(12) if (trial not in block)])
+
+        for iteration in range(n_tests):
+            """
+            balanced_trials = np.union1d(
+                np.random.choice(np.where(isi_id == 1.6)[0], 2, False),
+                np.union1d(
+                    np.random.choice(np.where(isi_id == 3.2)[0], 2, False),
+                    np.random.choice(np.where(isi_id == 4.8)[0], 2, False)))
+            """
+            balanced_trials = np.where(isi_id == isi_id[block[0]])
+            balanced_combinations_face = combinations_face[balanced_trials]
+            balanced_combinations_house = combinations_house[balanced_trials]
+            balance_index = np.hstack([np.union1d(
+                balanced_combinations_face[trial][np.random.randint(len(
+                    balanced_combinations_face[trial]))],
+                balanced_combinations_house[trial][np.random.randint(len(
+                    balanced_combinations_house[trial]))])
+                for trial in range(len(balanced_combinations_face))])
+            selected_cats_train = cats_train[balance_index]
+            selected_stimuli_train = stimuli_train[balance_index]
+            log.fit(selected_cats_train, selected_stimuli_train)
+            accuracy += log.score(cats_test, stimuli_test)
+        accuracy /= n_tests
+
+    else:
+        log.fit(cats_train, stimuli_train)
+        accuracy = log.score(cats_test, stimuli_test)
+
+    return accuracy
+
+
+def forest_deconvolution(estimation_train, estimation_test, stimuli_train,
+                         stimuli_test, logistic_window, delay=0):
+    """ Learn a deconvolution filter for classification given a time window
+    using logistic regression """
+    forest = RandomForestClassifier()
+
+    if delay != 0:
+        estimation_train, estimation_test = (estimation_train[delay:],
+                                             estimation_test[delay:])
+        stimuli_train, stimuli_test = (stimuli_train[:-delay],
+                                       stimuli_test[:-delay])
+
+    cats_train = [
+        estimation_train[scan: scan + logistic_window].ravel()
+        for scan in xrange(len(estimation_train) - logistic_window + 1)]
+    cats_test = [
+        estimation_test[scan: scan + logistic_window].ravel()
+        for scan in xrange(len(estimation_test) - logistic_window + 1)]
+
+    train_mask = np.sum(
+        stimuli_train[:len(cats_train), 1:], axis=1).astype(bool)
+    test_mask = np.sum(
+        stimuli_test[:len(cats_test), 1:], axis=1).astype(bool)
+
+    stimuli_train, stimuli_test = (
+        np.argmax(stimuli_train[:len(cats_train)][train_mask], axis=1),
+        np.argmax(stimuli_test[:len(cats_test)][test_mask], axis=1))
+    cats_train, cats_test = (
+        np.array(cats_train)[train_mask], np.array(cats_test)[test_mask])
+
+    forest.fit(cats_train, stimuli_train)
+    accuracy = forest.score(cats_test, stimuli_test)
 
     return accuracy
 
@@ -220,7 +304,7 @@ def glm(fmri, tr, onsets, conditions=None, durations=None, hrf_model='spm',
         else:
             separate_conditions = np.arange(len(onsets[session]))
         X = design_matrix(n_scans, tr, onsets[session], separate_conditions,
-                          drift_model=drift_model)
+                          durations=durations[session], drift_model=drift_model)
         if model == 'GLMs':
             session_betas = []
             design_sum = np.sum(X, axis=1)

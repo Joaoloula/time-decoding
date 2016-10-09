@@ -99,7 +99,7 @@ def gauthier_barplot():
     plt.figure(figsize=(4, 6))
 
     # Load data
-    data = pickle.load(open('../scripts/gauthier_all+tde_dataframe.pickle',
+    data = pickle.load(open('../scripts/all_gauthier_separate.pickle',
                             'rb'))
 
     # Colors
@@ -107,14 +107,12 @@ def gauthier_barplot():
 
     # Plot
     ax = sns.barplot(x='model', y='accuracy', hue='isi', data=data,
-                     order=['GLM', 'GLMs', 'time-delayed embedding',
-                            'logistic deconvolution'], palette=cmap)
+                     order=['GLM', 'logistic deconvolution'], palette=cmap)
     """
     sns.swarmplot(x='model', y='accuracy', hue='isi', data=data, palette=cmap,
                   split=True)
     """
-    x_ticks = ['GLM', 'GLMs', 'Time-delayed\nembedding',
-               'Logistic\ndeconvolution']
+    x_ticks = ['GLM', 'Logistic\ndeconvolution']
     ax.set_xticklabels(x_ticks)
     ax.set_ylim(0.4, 0.8)
 
@@ -131,6 +129,7 @@ def all_boxplot():
     # Load data
     data = pickle.load(open('../scripts/mrt_gauthier_all_dataframe.pickle',
                             'rb'))
+    data = data.loc[data['dataset'] == 'mirror-reversed text']
 
     # Colors
     cmap = sns.color_palette("colorblind", n_colors=3)
@@ -143,6 +142,8 @@ def all_boxplot():
     sns.swarmplot(x='accuracy', y='model', hue='dataset', data=data,
                   palette=cmap, split=True)
     """
+    ax.legend(loc='lower left')
+
     y_ticks = ['Mirror-\nreversed\nText', 'Temporal\nTuning']
     ax.set_yticklabels(y_ticks)
 

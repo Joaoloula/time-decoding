@@ -6,7 +6,7 @@ import numpy as np
 # Parameters
 subject_list = np.arange(14)
 tr = 2
-k = 2000
+k = 10000
 
 # TDE parameters
 time_window = 3

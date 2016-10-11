@@ -8,12 +8,12 @@ import itertools
 subject_list = range(11)
 k = 10000
 tr = 1.5
-model = 'GLM'
+model = 'spatiotemporal SVM'
 n_tests = 20
-np.random.seed(42)
 
-# GLM parameters
-hrf_model = 'spm'
+# stSVM parameters
+time_window = 4
+delay = 1
 
 scores, subjects, models, isis = [], [], [], []
 for subject in subject_list:
@@ -24,10 +24,9 @@ for subject in subject_list:
                          len(onsets[session]) for session in range(len(onsets))]
     isi_id = [round(19.2 / len(onsets[session]), 2)
               for session in range(len(onsets))]
-    betas, reg = de.glm(fmri, tr, onsets, durations=None,
-                        hrf_model=hrf_model, drift_model='blank', model=model)
+    fmri_windows = de.apply_time_window(fmri, stimuli, time_window, delay)
 
-    betas = np.vstack(betas)
+    fmri_windows = np.vstack(fmri_windows)
     conditions = np.hstack(conditions)
     session_id_onset = np.hstack(session_id_onset)
 
@@ -53,7 +52,8 @@ for subject in subject_list:
         # Split into train and test sets
         test_index = np.union1d(np.where(session_id_onset == blocks[0])[0],
                                 np.where(session_id_onset == blocks[1])[0])
-        conditions_test, betas_test = conditions[test_index], betas[test_index]
+        conditions_test, fmri_windows_test = (conditions[test_index],
+                                              fmri_windows[test_index])
 
         n_points = len(conditions_test)
         if n_points == 12 * 2:
@@ -93,14 +93,16 @@ for subject in subject_list:
                 balanced_combinations_house[trial][np.random.randint(len(
                     balanced_combinations_house[trial]))])
                 for trial in range(len(balanced_combinations_face))])
-            betas_train, conditions_train = (betas[train_index],
-                                             conditions[train_index])
+            fmri_windows_train, conditions_train = (fmri_windows[train_index],
+                                                    conditions[train_index])
             # Feature selection
-            selected_betas_train, selected_betas_test = de.feature_selection(
-                betas_train, betas_test, conditions_train, k=k)
+            selected_fmri_windows_train, selected_fmri_windows_test = (
+                de.feature_selection(fmri_windows_train, fmri_windows_test,
+                                     conditions_train, k=k))
 
             # Fit a logistic regression to score the model
-            accuracy = de.glm_scoring(selected_betas_train, selected_betas_test,
+            accuracy = de.svm_scoring(selected_fmri_windows_train,
+                                      selected_fmri_windows_test,
                                       conditions_train, conditions_test)
 
             block_score += accuracy

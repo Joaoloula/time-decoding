@@ -2,6 +2,7 @@ from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.ensemble import RandomForestClassifier
 from nistats.design_matrix import make_design_matrix
 from sklearn import linear_model, metrics
+from sklearn.svm import SVC
 import pandas as pd
 import numpy as np
 import itertools
@@ -21,7 +22,24 @@ def feature_selection(fmri_train, fmri_test, stimuli_train, k=10000):
     return fmri_train, fmri_test
 
 
-def apply_time_window(fmri_train, fmri_test, stimuli_train, stimuli_test,
+def apply_time_window(fmri_list, stimuli, time_window, delay):
+
+    stimuli_list = stimuli.reshape(12, -1, 3)
+    mask = [np.sum(stimuli[:, 1:], axis=1) for stimuli in stimuli_list]
+
+    if delay != 0:
+        fmri_list = [fmri[delay:] for fmri in fmri_list]
+        stimuli_list = [stimuli[:-delay] for stimuli in stimuli_list]
+
+    fmri_window = [fmri_list[block][scan: scan + time_window].ravel()
+                   for block in range(len(fmri_list))
+                   for scan in xrange(len(fmri_list[block]) - time_window + 1)
+                   if mask[block][scan] == 1]
+
+    return fmri_window
+
+
+def apply_time_window2(fmri_train, fmri_test, stimuli_train, stimuli_test,
                       delay=3, time_window=8, k=10000):
     """
     Applies a time window to a given experiment, extending the fmri to contain
@@ -303,8 +321,13 @@ def glm(fmri, tr, onsets, conditions=None, durations=None, hrf_model='spm',
             separate_conditions = conditions[session]
         else:
             separate_conditions = np.arange(len(onsets[session]))
-        X = design_matrix(n_scans, tr, onsets[session], separate_conditions,
-                          durations=durations[session], drift_model=drift_model)
+        if durations is not None:
+            X = design_matrix(n_scans, tr, onsets[session], separate_conditions,
+                              durations=durations[session],
+                              drift_model=drift_model)
+        else:
+            X = design_matrix(n_scans, tr, onsets[session], separate_conditions,
+                              drift_model=drift_model)
         if model == 'GLMs':
             session_betas = []
             design_sum = np.sum(X, axis=1)
@@ -351,4 +374,11 @@ def glm_scoring(betas_train, betas_test, labels_train, labels_test):
     log = linear_model.LogisticRegression()
     log.fit(betas_train, labels_train)
     score = log.score(betas_test, labels_test)
+    return score
+
+def svm_scoring(betas_train, betas_test, labels_train, labels_test):
+    """ Fits a logistic regression and scores it for a glm estimation """
+    svc = SVC()
+    svc.fit(betas_train, labels_train)
+    score = svc.score(betas_test, labels_test)
     return score

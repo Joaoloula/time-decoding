@@ -107,12 +107,9 @@ def gauthier_barplot():
 
     # Plot
     ax = sns.barplot(x='model', y='accuracy', hue='isi', data=data,
-                     order=['GLM', 'logistic deconvolution'], palette=cmap)
-    """
-    sns.swarmplot(x='model', y='accuracy', hue='isi', data=data, palette=cmap,
-                  split=True)
-    """
-    x_ticks = ['GLM', 'Logistic\ndeconvolution']
+                     order=['GLM', 'GLMs', 'spatiotemporal SVM',
+                            'logistic deconvolution'], palette=cmap)
+    x_ticks = ['GLM', 'GLMs', 'Spatiotemporal\nSVM', 'Logistic\nDeconvolution']
     ax.set_xticklabels(x_ticks)
     ax.set_ylim(0.4, 0.8)
 

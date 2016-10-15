@@ -1,20 +1,21 @@
 from sklearn.cross_validation import LeavePLabelOut
 from time_decoding.data_reading import read_data_texture
 import time_decoding.decoding as de
+import pandas as pd
 import numpy as np
 
 # Parameters
-subject_list = range(1)
+subject_list = range(7)
 tr = 2.4
 k = 10000
+model = 'logistic deconvolution'
 
 # GLM parameters
 hrf_model = 'spm'
-logistic_window = 4
-delay = 0
+logistic_window = 3
+delay = 1
 
-all_scores = []
-all_predictions = []
+subjects, models, scores = [], [], []
 for subject in subject_list:
     subject_scores = []
     # Read data
@@ -49,16 +50,22 @@ for subject in subject_list:
             fmri_train, fmri_test, design_train, design_test,
             double_prediction=True, extra=fmri_train)
 
-        all_predictions.append([design_test, prediction_test, score])
-
         # Fit a logistic regression for deconvolution
         accuracy = de.logistic_deconvolution(
             prediction_train, prediction_test, stimuli_train[:, :-1],
             stimuli_test[:, :-1], logistic_window, delay=delay)
 
-        subject_scores.append(accuracy)
-
-    all_scores.append(subject_scores)
+        scores.append(accuracy)
+        subjects.append(subject)
+        models.append(model)
+        print('finished one CV step')
 
     print('finished subject ' + str(subject))
-    print(subject_scores)
+
+dict = {}
+dict['subject'] = subjects
+dict['model'] = models
+dict['accuracy'] = scores
+
+data = pd.DataFrame(dict)
+print(np.mean(data['accuracy']))

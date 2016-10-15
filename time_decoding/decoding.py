@@ -22,19 +22,21 @@ def feature_selection(fmri_train, fmri_test, stimuli_train, k=10000):
     return fmri_train, fmri_test
 
 
-def apply_time_window(fmri_list, stimuli, time_window, delay):
+def apply_time_window(fmri_list, stimuli_list, time_window, delay):
 
-    stimuli_list = stimuli.reshape(12, -1, 3)
+    if len(stimuli_list.shape) != 3:
+        stimuli_list = stimuli_list.reshape(12, -1, 3)
+
     mask = [np.sum(stimuli[:, 1:], axis=1) for stimuli in stimuli_list]
 
     if delay != 0:
         fmri_list = [fmri[delay:] for fmri in fmri_list]
         stimuli_list = [stimuli[:-delay] for stimuli in stimuli_list]
 
-    fmri_window = [fmri_list[block][scan: scan + time_window].ravel()
-                   for block in range(len(fmri_list))
-                   for scan in xrange(len(fmri_list[block]) - time_window + 1)
-                   if mask[block][scan] == 1]
+    fmri_window = [[fmri_list[block][scan: scan + time_window].ravel()
+                    for scan in xrange(len(fmri_list[block]) - time_window + 1)
+                    if mask[block][scan] == 1]
+                   for block in range(len(fmri_list))]
 
     return fmri_window
 
@@ -208,12 +210,11 @@ def logistic_deconvolution(estimation_train, estimation_test, stimuli_train,
     cats_train, cats_test = (
         np.array(cats_train)[train_mask], np.array(cats_test)[test_mask])
 
-    # Balance classes in train set
-    isi_id = [round(19.2 / len(np.where(session_id_onset == trial)[0]), 2)
-              for trial in range(12)]
-
     if balance:
         accuracy = 0
+        # Balance classes in train set
+        isi_id = [round(19.2 / len(np.where(session_id_onset == trial)[0]), 2)
+                  for trial in range(12)]
         isi_id = np.delete(isi_id, block)
         onsets = np.delete(session_id_onset,
                            np.union1d(np.where(session_id_onset == block[0])[0],

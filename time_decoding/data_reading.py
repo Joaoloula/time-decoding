@@ -65,17 +65,19 @@ def _read_stimuli_texture(stimuli_path, stim_set, n_tasks=6, tr=2.4, glm=False):
         return onsets, conditions
 
     classes = np.array(['rest', '01', '09', '12', '13', '14', '25', '0'])
-    n_scans = 184 * n_tasks
-    stimuli = np.zeros((n_scans, len(classes)))
-    for t, stim in enumerate(conditions.ravel()):
-        stim_class = np.where(classes == stim[:2])[0]
-        scan = int(round(t * 4 / tr))
+    n_scans = 184
+    stimuli = np.zeros((n_tasks, n_scans, len(classes)))
+    for task in range(n_tasks):
+        for t, stim in enumerate(conditions[task]):
+            stim_class = np.where(classes == stim[:2])[0]
+            scan = int(round(t * 4 / tr))
 
-        stimuli[scan][stim_class] = 1
+            stimuli[task, scan, stim_class] = 1
 
-    # Fill the rest with category 'rest'
-    rest_scans = np.where(np.sum(stimuli, axis=1) == 0)
-    stimuli[rest_scans, 0] = 1
+        # Fill the rest with category 'rest'
+        rest_scans = np.where(np.sum(stimuli[task], axis=1) == 0)
+        stimuli[task, rest_scans, 0] = 1
+
     return stimuli
 
 

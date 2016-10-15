@@ -9,9 +9,10 @@ subject_list = range(7)
 k = 10000
 tr = 2.4
 
-# GLM parameters
-hrf_model = 'spm'
-model = 'GLMs'
+# stSVM parameters
+model = 'spatiotemporal svm'
+time_window = 3
+delay = 1
 
 scores, models, subjects = [], [], []
 for subject in subject_list:
@@ -21,42 +22,35 @@ for subject in subject_list:
     separate_conditions = [[scan + 1 if conditions[session][scan] != '0' else 0
                             for scan in range(len(conditions[session]))]
                            for session in range(len(conditions))]
-    betas, regressors = de.glm(fmri, tr, onsets, separate_conditions,
-                               hrf_model=hrf_model, model=model)
 
-    betas = betas[:, 1:]  # Remove '0' category
-    session_id_onset = np.array([[session] * len(betas[session])
+    # stimuli = stimuli.reshape(6, -1, 8)
+    fmri_windows = de.apply_time_window(fmri, stimuli, time_window, delay)
+
+    fmri_windows = [[fmri_windows[trial][cond]
+                     for cond in range(len(conditions[trial]))
+                     if conditions[trial][cond] != '0']
+                    for trial in range(len(conditions))]
+    session_id_onset = np.array([[session] * len(fmri_windows[session])
                                  for session in range(len(onsets))]).ravel()
-    betas = np.vstack(betas)
+    fmri_windows = np.vstack(fmri_windows)
     conditions = np.hstack(conditions)
     conditions_ = np.array([condition[:2] for condition in conditions
                             if condition != '0'])
     lplo = LeavePLabelOut(session_id_onset, p=1)
     for train_index, test_index in lplo:
         # Split into train and test sets
-        betas_train, betas_test = betas[train_index], betas[test_index]
+        fmri_windows_train, fmri_windows_test = (fmri_windows[train_index],
+                                                 fmri_windows[test_index])
         conditions_train, conditions_test = (conditions_[train_index],
                                              conditions_[test_index])
-        """
-        # Mask to remove '0' category
-        train_mask = np.array([
-            ct in ['01', '09', '12', '13', '14', '25']
-            for ct in conditions_train])
-        test_mask = np.array([
-            ct in ['01', '09', '12', '13', '14', '25']
-            for ct in conditions_test])
-        betas_train, conditions_train = [betas_train[train_mask],
-                                         conditions_train[train_mask]]
-        betas_test, conditions_test = [betas_test[test_mask],
-                                       conditions_test[test_mask]]
-        """
+
         # Feature selection
-        betas_train, betas_test = de.feature_selection(betas_train, betas_test,
-                                                       conditions_train, k=k)
+        fmri_windows_train, fmri_windows_test = de.feature_selection(
+            fmri_windows_train, fmri_windows_test, conditions_train, k=k)
 
         # Fit a logistic regression to score the model
-        accuracy = de.glm_scoring(betas_train, betas_test, conditions_train,
-                                  conditions_test)
+        accuracy = de.svm_scoring(fmri_windows_train, fmri_windows_test,
+                                  conditions_train, conditions_test)
 
         scores.append(accuracy)
         subjects.append(subject)

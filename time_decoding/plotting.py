@@ -118,15 +118,148 @@ def gauthier_barplot():
     plt.show()
 
 
+def gauthier_barplotv2():
+    general_settings()
+    plt.figure(figsize=(4, 6))
+
+    # Load data
+    data = pickle.load(open('../scripts/all_gauthier_separate.pickle',
+                            'rb'))
+
+    # Colors
+    cmap = sns.color_palette("Set2", n_colors=4)
+
+    # Specify that I want each subplot to correspond to
+    # a different robot type
+    g = sns.FacetGrid(
+        data,
+        col="isi",
+        col_order=[1.6, 3.2, 4.8],
+        sharex=False)
+
+    # Create the bar plot on each subplot
+    g.map(
+        sns.barplot,
+        "isi", "accuracy", "model",
+        hue_order=['GLM', 'GLMs', 'spatiotemporal SVM',
+                   'logistic deconvolution'], palette=cmap)
+
+    # Now I need to draw the 50% lines on each subplot
+    # separately
+    axes = np.array(g.axes.flat)
+    for ax in axes:
+        ax.hlines(0.5, -0.5, 0.5, linestyle='--', linewidth=1)
+        ax.set_ylim(0.45, 0.75)
+
+    # Remove the "spines" (the lines surrounding the subplot)
+    # including the left spine for the 2nd and 3rd subplots
+    sns.despine(ax=axes[1], left=True)
+    sns.despine(ax=axes[2], left=True)
+
+    # These are the labels of each subplot
+    labels = ["1.6s", "3.2s", "4.8s"]
+
+    # Iterate over each subplot and set the labels
+    for i, ax in enumerate(axes):
+
+        # Set the x-axis ticklabels
+        ax.set_xticks([-.3, -.1, .1, .3])
+        ax.set_xticklabels(['GLM', 'GLMs', 'Spatio-\ntemporal\nSVM',
+                            'Logistic\ndeconvo-\nlution'])
+
+        # Set the label for each subplot
+        ax.set_xlabel(labels[i])
+
+        # Remove the y-axis label and title
+        ax.set_ylabel("")
+        ax.set_title("")
+
+    axes.flat[0].set_ylabel("accuracy")
+    plt.tight_layout()
+
+    plt.savefig('gauthier_barplot.png')
+
+    plt.show()
+
+
+def boxplot_grid():
+    general_settings()
+    plt.figure(figsize=(10, 10))
+
+    # Load data
+    data = pickle.load(open('../scripts/mrt_texture_normalized.pickle',
+                            'rb'))
+    data = data.replace('mirror-reversed text', 'Mirror-\nreversed\nText')
+    data = data.replace('texture decoding', 'Texture\ndecoding')
+    # Colors
+    cmap = sns.color_palette("Set2", n_colors=4)
+
+    # Specify that I want each subplot to correspond to
+    # a different robot type
+    g = sns.FacetGrid(
+        data,
+        row="dataset",
+        row_order=['Mirror-\nreversed\nText', 'Texture\ndecoding'],
+        sharey=False)
+
+    # Create the bar plot on each subplot
+    g.map(
+        sns.boxplot,
+        "accuracy", "dataset", "model", orient='h', palette=cmap,
+        hue_order=['GLM', 'GLMs', 'spatiotemporal SVM',
+                   'logistic deconvolution'])
+
+    # Now I need to draw the 50% lines on each subplot
+    # separately
+    axes = np.array(g.axes.flat)
+    for ax in axes:
+        ax.vlines(0, -0.5, 0.5, linestyle='--', linewidth=1)
+        ax.set_xlim(-0.4, 0.4)
+
+    # Remove the "spines" (the lines surrounding the subplot)
+    # including the left spine for the 2nd and 3rd subplots
+    sns.despine(ax=axes[0], left=True, bottom=True)
+    sns.despine(ax=axes[1], left=True)
+
+    x_ticks = ['-20%', '', '-10%', '', '0%', '', '10%', '', '20%']
+    axes[1].set_xticklabels(x_ticks)
+
+    # These are the labels of each subplot
+    labels = ["", ""]
+
+    # Iterate over each subplot and set the labels
+    for i, ax in enumerate(axes):
+
+        """
+        # Set the x-axis ticklabels
+        ax.set_xticks([-.3, -.1, .1, .3])
+        ax.set_xticklabels(['GLM', 'GLMs', 'Spatio-\ntemporal\nSVM',
+                            'Logistic\ndeconvo-\nlution'])
+        """
+        # Set the label for each subplot
+        ax.set_ylabel(labels[i])
+
+        # Remove the y-axis label and title
+        ax.set_xlabel("")
+        ax.set_title("")
+
+    # axes.flat[0].set_ylabel("accuracy")
+
+    # plt.tight_layout()
+
+    plt.savefig('all_boxplot.png')
+
+    plt.show()
+
+
 def all_boxplot():
     """ """
     general_settings()
     plt.figure(figsize=(4, 6))
 
     # Load data
-    data = pickle.load(open('../scripts/mrt_gauthier_all_dataframe.pickle',
+    data = pickle.load(open('../scripts/mrt_gauthier_normalized.pickle',
                             'rb'))
-    data = data.loc[data['dataset'] == 'mirror-reversed text']
 
     # Colors
     cmap = sns.color_palette("colorblind", n_colors=3)

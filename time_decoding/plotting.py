@@ -208,7 +208,7 @@ def boxplot_grid():
         sns.boxplot,
         "accuracy", "dataset", "model", orient='h', palette=cmap,
         hue_order=['GLM', 'GLMs', 'spatiotemporal SVM',
-                   'logistic deconvolution'])
+                   'logistic deconvolution'], width=0.5)
 
     # Now I need to draw the 50% lines on each subplot
     # separately

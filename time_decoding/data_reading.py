@@ -1,4 +1,5 @@
-from nilearn.input_data import MultiNiftiMasker
+from nilearn.input_data import NiftiMasker, MultiNiftiMasker
+from nilearn.datasets import fetch_haxby
 from nilearn.image import load_img
 import pandas as pd
 import numpy as np
@@ -147,6 +148,49 @@ def read_data_texture(subject, n_tasks=6, tr=2.4,
     fmri = [_read_fmri_texture(sub, path, task)
             for task in range(n_tasks)]
     fmri = _uniform_masking(fmri, tr=tr)
+
+    return fmri, stimuli, onsets, conditions
+
+
+def read_data_haxby(subject, tr=2.5):
+    haxby_dataset = fetch_haxby(subjects=[subject])
+
+    # Load fmri data
+    fmri_filename = haxby_dataset.func[0]
+    fmri = load_img(fmri_filename)
+    # mask = haxby_dataset.mask_vt[0]
+    masker = NiftiMasker(mask_strategy='epi', standardize=True, detrend=True,
+                         high_pass=0.01, t_r=tr, smoothing_fwhm=5)
+    fmri = masker.fit_transform(fmri)
+    fmri = fmri.reshape(12, -1, fmri.shape[-1])
+
+    # Load stimuli data
+    classes = np.array(['rest', 'face', 'house', 'bottle', 'cat', 'chair',
+                        'scissors', 'shoe', 'scrambledpix'])
+    labels = np.recfromcsv(
+        haxby_dataset.session_target[0], delimiter=" ")['labels'].reshape(
+            12, -1)
+    stimuli, onsets, conditions = (np.zeros((
+        12, len(labels[0]), len(classes))), [], [])
+    stimuli[0, 0] = 1
+    for session in range(12):
+        onsets.append([])
+        conditions.append([])
+        for scan in range(1, len(fmri[session])):
+            if (labels[session][scan - 1] == 'rest' and
+                labels[session][scan] != 'rest'):
+                label = labels[session][scan]
+                stimuli[session, scan, np.where(classes == label)[0][0]] = 1
+                conditions[session].append(label)
+                onsets[session].append(scan * tr)
+            else:
+                stimuli[session, scan, 0] = 1
+
+    if subject == 5:
+        fmri = np.vstack((fmri[:8], fmri[9:]))
+        stimuli = np.vstack((stimuli[:8], stimuli[9:]))
+        onsets = np.vstack((onsets[:8], onsets[9:]))
+        conditions = np.vstack((conditions[:8], conditions[9:]))
 
     return fmri, stimuli, onsets, conditions
 

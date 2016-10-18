@@ -184,11 +184,12 @@ def gauthier_barplotv2():
 
 def boxplot_grid():
     general_settings()
-    plt.figure(figsize=(10, 10))
+    plt.figure(figsize=(6, 6))
 
     # Load data
-    data = pickle.load(open('../scripts/mrt_texture_normalized.pickle',
+    data = pickle.load(open('../scripts/haxby_mrt_texture_normalized.pickle',
                             'rb'))
+    data = data.replace('haxby', 'Haxby')
     data = data.replace('mirror-reversed text', 'Mirror-\nreversed\nText')
     data = data.replace('texture decoding', 'Texture\ndecoding')
     # Colors
@@ -199,7 +200,7 @@ def boxplot_grid():
     g = sns.FacetGrid(
         data,
         row="dataset",
-        row_order=['Mirror-\nreversed\nText', 'Texture\ndecoding'],
+        row_order=['Haxby', 'Mirror-\nreversed\nText', 'Texture\ndecoding'],
         sharey=False)
 
     # Create the bar plot on each subplot
@@ -219,13 +220,14 @@ def boxplot_grid():
     # Remove the "spines" (the lines surrounding the subplot)
     # including the left spine for the 2nd and 3rd subplots
     sns.despine(ax=axes[0], left=True, bottom=True)
-    sns.despine(ax=axes[1], left=True)
+    sns.despine(ax=axes[1], left=True, bottom=True)
+    sns.despine(ax=axes[2], left=True)
 
     x_ticks = ['-20%', '', '-10%', '', '0%', '', '10%', '', '20%']
     axes[1].set_xticklabels(x_ticks)
 
     # These are the labels of each subplot
-    labels = ["", ""]
+    labels = ["", "", ""]
 
     # Iterate over each subplot and set the labels
     for i, ax in enumerate(axes):
@@ -245,7 +247,7 @@ def boxplot_grid():
 
     # axes.flat[0].set_ylabel("accuracy")
 
-    # plt.tight_layout()
+    plt.tight_layout()
 
     plt.savefig('all_boxplot.png')
 

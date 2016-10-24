@@ -119,8 +119,12 @@ def gauthier_barplot():
 
 
 def gauthier_barplotv2():
-    general_settings()
-    plt.figure(figsize=(4, 6))
+    sns.set(font='serif')
+    sns.set_style("white", {
+        "font.family": "serif",
+        "font.serif": ["Times", "Palatino", "serif"]
+    })
+    sns.set_context('paper', font_scale=1.5)
 
     # Load data
     data = pickle.load(open('../scripts/all_gauthier_separate.pickle',
@@ -148,8 +152,8 @@ def gauthier_barplotv2():
     # separately
     axes = np.array(g.axes.flat)
     for ax in axes:
-        ax.hlines(0.5, -0.5, 0.5, linestyle='--', linewidth=1)
         ax.set_ylim(0.45, 0.75)
+        ax.hlines(0.5, -0.5, 0.5, linestyle='--', linewidth=1)
 
     # Remove the "spines" (the lines surrounding the subplot)
     # including the left spine for the 2nd and 3rd subplots
@@ -163,10 +167,13 @@ def gauthier_barplotv2():
     for i, ax in enumerate(axes):
 
         # Set the x-axis ticklabels
+        """
         ax.set_xticks([-.3, -.1, .1, .3])
         ax.set_xticklabels(['GLM', 'GLMs', 'Spatio-\ntemporal\nSVM',
                             'Logistic\ndeconvo-\nlution'])
-
+        """
+        ax.set_xticks([-.3, -.1, .1, .3])
+        ax.set_xticklabels(['', '', '', ''])
         # Set the label for each subplot
         ax.set_xlabel(labels[i])
 
@@ -175,6 +182,9 @@ def gauthier_barplotv2():
         ax.set_title("")
 
     axes.flat[0].set_ylabel("accuracy")
+    axes.flat[0].set_yticklabels(['', '', '0.5', '', '0.6', '', '0.7'])
+    fig = plt.gcf()
+    fig.set_size_inches(6, 2)
     plt.tight_layout()
 
     plt.savefig('gauthier_barplot.png')
@@ -183,15 +193,19 @@ def gauthier_barplotv2():
 
 
 def boxplot_grid():
-    general_settings()
-    plt.figure(figsize=(6, 6))
+    sns.set(font='serif')
+    sns.set_style("white", {
+        "font.family": "serif",
+        "font.serif": ["Times", "Palatino", "serif"]
+    })
+    sns.set_context('paper', font_scale=1.5)
 
     # Load data
     data = pickle.load(open('../scripts/haxby_mrt_texture_normalized.pickle',
                             'rb'))
-    data = data.replace('haxby', 'Haxby')
-    data = data.replace('mirror-reversed text', 'Mirror-\nreversed\nText')
-    data = data.replace('texture decoding', 'Texture\ndecoding')
+    data = data.replace('haxby', 'Haxby\n(ISI = 12s)')
+    data = data.replace('mirror-reversed text', 'Mirror-reversed text\n(ISI = 3-12s)')
+    data = data.replace('texture decoding', 'Texture decoding\n(ISI = 4s)')
     # Colors
     cmap = sns.color_palette("Set2", n_colors=4)
 
@@ -200,7 +214,8 @@ def boxplot_grid():
     g = sns.FacetGrid(
         data,
         row="dataset",
-        row_order=['Haxby', 'Mirror-\nreversed\nText', 'Texture\ndecoding'],
+        row_order=['Haxby\n(ISI = 12s)', 'Mirror-reversed text\n(ISI = 3-12s)',
+                   'Texture decoding\n(ISI = 4s)'],
         sharey=False)
 
     # Create the bar plot on each subplot
@@ -208,14 +223,15 @@ def boxplot_grid():
         sns.boxplot,
         "accuracy", "dataset", "model", orient='h', palette=cmap,
         hue_order=['GLM', 'GLMs', 'spatiotemporal SVM',
-                   'logistic deconvolution'], width=0.5)
+                   'logistic deconvolution'], width=0.5, linewidth=1.75)
 
     # Now I need to draw the 50% lines on each subplot
     # separately
     axes = np.array(g.axes.flat)
     for ax in axes:
-        ax.vlines(0, -0.5, 0.5, linestyle='--', linewidth=1)
+        ax.vlines(0, -0.5, 0.5, linestyle='--', linewidth=1.2)
         ax.set_xlim(-0.4, 0.4)
+        ax.set_ylim(0.3, -0.3)
 
     # Remove the "spines" (the lines surrounding the subplot)
     # including the left spine for the 2nd and 3rd subplots
@@ -223,8 +239,14 @@ def boxplot_grid():
     sns.despine(ax=axes[1], left=True, bottom=True)
     sns.despine(ax=axes[2], left=True)
 
-    x_ticks = ['-20%', '', '-10%', '', '0%', '', '10%', '', '20%']
-    axes[1].set_xticklabels(x_ticks)
+    text = ['-20%', '', '-10%', '', '0%', '', '10%', '', '20%']
+    pos_text = ['20%', '', '10%', '', '0%', '', '10%', '', '20%']
+    pos = [-0.4, -0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3, 0.4]
+    """
+    axes[2].set_xticks([p + .02
+                        for p, t in zip(pos, pos_text)])
+    """
+    axes[2].set_xticklabels(text)
 
     # These are the labels of each subplot
     labels = ["", "", ""]
@@ -247,9 +269,47 @@ def boxplot_grid():
 
     # axes.flat[0].set_ylabel("accuracy")
 
+    fig = plt.gcf()
+    fig.set_size_inches(6, 6)
     plt.tight_layout()
 
     plt.savefig('all_boxplot.png')
+
+    plt.show()
+
+
+def models_label():
+    general_settings()
+    cmap = sns.color_palette("Set2", n_colors=4)
+
+    fig, ax = plt.subplots(1)
+    fig.set_size_inches(6, 1)
+    ax.axis('off')
+
+    size = 13
+    """
+    ax.text(0.2, 0.1, 'GLM', color=cmap[0], size=size)
+    ax.text(0.2, 0, 'GLMs', color=cmap[1], size=size)
+    ax.text(0.6, 0.1, 'Spatiotemporal SVM', color=cmap[2], size=size)
+    ax.text(0.6, 0, 'Logistic deconvolution', color=cmap[3], size=size)
+    """
+    ax.set_xlim(0, 1)
+    ax.text(-0.1, 0, 'GLM', size=size)
+    ax.text(0.05, 0, 'GLMs', size=size)
+    ax.text(0.22, 0, 'Spatiotemporal SVM', size=size)
+    ax.text(0.68, 0, 'Logistic deconvolution', size=size)
+
+    size1, size2 = 0.03, 6*0.03
+    rect1 = patches.Rectangle((0, 0.3), size1, size2, color=cmap[0])
+    rect2 = patches.Rectangle((0.015,0), size1, size2, color=cmap[1])
+    rect3 = patches.Rectangle((0.185,0), size1, size2, color=cmap[2])
+    rect4 = patches.Rectangle((0.645,0), size1, size2, color=cmap[3])
+    ax.add_patch(rect1)
+    ax.add_patch(rect2)
+    ax.add_patch(rect3)
+    ax.add_patch(rect4)
+
+    plt.savefig('models_label.png')
 
     plt.show()
 
@@ -404,6 +464,33 @@ def figure_mrt_time_series():
 
     plt.show()
 
+
+def haxby_time_series():
+    sns.set(font='serif')
+    sns.set_style("white", {
+        "font.family": "serif",
+        "font.serif": ["Times", "Palatino", "serif"]
+    })
+    sns.set_context('paper', font_scale=3)
+
+    prediction = np.load('haxby_log_model_prediction.npy')[:, 1:]
+    onset = 6
+    time_series = prediction[onset: onset + 10]
+    cmap = sns.color_palette("colorblind", n_colors=8)
+
+    plt.plot(time_series[:, 1], color=cmap[0], linewidth=3)
+
+    frame, fig = plt.gca(), plt.gcf()
+    frame.axes.get_yaxis().set_ticks([])
+    plt.xticks(np.arange(10), ['0', '', '5', '', '10', '', '15', '', '20', ''])
+    plt.xlabel('time after onset (s)')
+    plt.ylabel('\'house\'\nactivation')
+
+    fig.set_size_inches(6, 4)
+    plt.tight_layout()
+
+    plt.savefig('haxby_log_model_time_series.png')
+    plt.show()
 
 def model_image_create_onsets():
     """ """

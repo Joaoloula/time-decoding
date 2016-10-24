@@ -152,7 +152,7 @@ def read_data_texture(subject, n_tasks=6, tr=2.4,
     return fmri, stimuli, onsets, conditions
 
 
-def read_data_haxby(subject, tr=2.5):
+def read_data_haxby(subject, tr=2.5, masker=False):
     haxby_dataset = fetch_haxby(subjects=[subject])
 
     # Load fmri data
@@ -172,7 +172,7 @@ def read_data_haxby(subject, tr=2.5):
             12, -1)
     stimuli, onsets, conditions = (np.zeros((
         12, len(labels[0]), len(classes))), [], [])
-    stimuli[0, 0] = 1
+    stimuli[:, 0, 0] = 1
     for session in range(12):
         onsets.append([])
         conditions.append([])
@@ -191,6 +191,9 @@ def read_data_haxby(subject, tr=2.5):
         stimuli = np.vstack((stimuli[:8], stimuli[9:]))
         onsets = np.vstack((onsets[:8], onsets[9:]))
         conditions = np.vstack((conditions[:8], conditions[9:]))
+
+    if masker:
+        return fmri, stimuli, onsets, conditions, masker
 
     return fmri, stimuli, onsets, conditions
 

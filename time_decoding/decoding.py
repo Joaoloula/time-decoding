@@ -8,7 +8,8 @@ import numpy as np
 import itertools
 
 
-def feature_selection(fmri_train, fmri_test, stimuli_train, k=10000):
+def feature_selection(fmri_train, fmri_test, stimuli_train, k=10000,
+                      selector=False):
     """ Applies anova feature selection to fmri data using classification
     accuracy on stimuli data as measure of performance """
 
@@ -18,6 +19,9 @@ def feature_selection(fmri_train, fmri_test, stimuli_train, k=10000):
 
     # Transform the given test set
     fmri_test = anova.transform(fmri_test)
+
+    if selector == True:
+        return fmri_train, fmri_test, anova
 
     return fmri_train, fmri_test
 

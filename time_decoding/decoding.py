@@ -383,7 +383,7 @@ def glm_scoring(betas_train, betas_test, labels_train, labels_test):
 
 def svm_scoring(betas_train, betas_test, labels_train, labels_test):
     """ Fits a logistic regression and scores it for a glm estimation """
-    svc = SVC()
+    svc = SVC(kernel='linear')
     svc.fit(betas_train, labels_train)
     score = svc.score(betas_test, labels_test)
     return score

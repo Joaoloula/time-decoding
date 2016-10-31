@@ -34,20 +34,27 @@ design = np.vstack(design)
 stimuli = np.vstack(stimuli)
 session_id_fmri = np.hstack(session_id_fmri)
 
+"""
+mask = np.logical_or(conditions == 'face', conditions == 'house')
+fmri = fmri[mask]
+session_id_fmri = session_id_fmri[mask]
+conditions = conditions[mask]
+"""
+
 train_index = np.where(session_id_fmri != 6)
 test_index = np.where(session_id_fmri == 6)
 # Split into train and test sets
 fmri_train, fmri_test = (fmri[train_index], fmri[test_index])
-stimuli_train, stimuli_test = (stimuli[train_index],
-                               stimuli[test_index])
+design_train, design_test = design[train_index], design[test_index]
+stimuli_train, stimuli_test = stimuli[train_index], stimuli[test_index]
 
 ridge = RidgeCV()
-ridge.fit(fmri_train, stimuli_train)
+ridge.fit(fmri_train, design_train[:, :3])
 prediction = ridge.predict(fmri_test)
 ridge_coef = - ridge.coef_[1] + ridge.coef_[2]  # 'face' vs. 'house'
 coef_img = masker.inverse_transform(ridge_coef)
 coef_map = coef_img.get_data()
-threshold = np.max(np.abs(coef_map)) * 0.05
+threshold = np.percentile(np.abs(coef_map), 98)
 
 # Plot stat map
 plot_stat_map(coef_img, bg_img=haxby_dataset.anat[0],

@@ -25,6 +25,11 @@ betas = np.vstack(betas)
 session_id_onset = np.hstack(session_id_onset)
 conditions = np.hstack(conditions)
 
+mask = np.logical_or(conditions == 'face', conditions == 'house')
+betas = betas[mask]
+session_id_onset = session_id_onset[mask]
+conditions = conditions[mask]
+
 train_index = np.where(session_id_onset != 6)
 test_index = np.where(session_id_onset == 6)
 # Split into train and test sets
@@ -40,9 +45,9 @@ betas_train, betas_test, anova = de.feature_selection(
 
 betas_test = anova.inverse_transform(betas_test[0])
 """
-coef_img = masker.inverse_transform(betas_test[0] - betas_test[3])
+coef_img = masker.inverse_transform(betas_test[0] - betas_test[1])
 coef_map = coef_img.get_data()
-threshold = np.max(np.abs(coef_map)) * 0.05
+threshold = np.percentile(np.abs(coef_map), 98)
 plot_stat_map(coef_img, bg_img=haxby_dataset.anat[0],
               display_mode='z', cut_coords=[-5],
               title=model+" weights", threshold=threshold)

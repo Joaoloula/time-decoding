@@ -25,6 +25,11 @@ fmri_windows = np.vstack(fmri_windows)
 session_id_onset = np.hstack(session_id_onset)
 conditions = np.hstack(conditions)
 
+mask = np.logical_or(conditions == 'face', conditions == 'house')
+fmri_windows = fmri_windows[mask]
+session_id_onset = session_id_onset[mask]
+conditions = conditions[mask]
+
 train_index = np.where(session_id_onset != 6)
 test_index = np.where(session_id_onset == 6)
 # Split into train and test sets
@@ -42,13 +47,13 @@ fmri_windows_train, fmri_windows_test, anova = de.feature_selection(
 
 svc = SVC(kernel='linear')
 svc.fit(fmri_windows_train, conditions_train)
-svc_coef = -svc.coef_[18]  # 'face' vs. 'house'
+svc_coef = svc.coef_[0]  # 'face' vs. 'house'
 # svc_coef = anova.inverse_transform(svc_coef)
-coef_img = masker.inverse_transform(svc_coef.reshape(10, -1)[1])
+coef_img = masker.inverse_transform(svc_coef.reshape(10, -1)[3])
 coef_map = coef_img.get_data()
-threshold = np.max(np.abs(coef_map)) * 0.05
+threshold = np.percentile(np.abs(coef_map), 98)
 plot_stat_map(coef_img, bg_img=haxby_dataset.anat[0],
               display_mode='z',cut_coords=[-5],
-              title=model+" weights")
+              title=model+" weights", threshold=threshold)
 
 show()

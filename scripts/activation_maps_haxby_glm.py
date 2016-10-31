@@ -47,7 +47,7 @@ betas_test = anova.inverse_transform(betas_test[0])
 """
 coef_img = masker.inverse_transform(betas_test[0] - betas_test[1])
 coef_map = coef_img.get_data()
-threshold = np.percentile(np.abs(coef_map), 99)
+threshold = np.percentile(np.abs(coef_map), 98)
 plot_stat_map(coef_img, bg_img=haxby_dataset.anat[0],
               display_mode='z', cut_coords=[-5],
               title=model+" weights", threshold=threshold)

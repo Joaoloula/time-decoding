@@ -8,7 +8,7 @@ haxby_dataset = datasets.fetch_haxby()
 
 # Parameters
 tr = 2.5
-model = 'GLM'
+model = 'GLMs'
 k = 10000
 
 # GLM parameters
@@ -40,11 +40,11 @@ betas_train, betas_test, anova = de.feature_selection(
 
 betas_test = anova.inverse_transform(betas_test[0])
 """
-coef_img = masker.inverse_transform(betas_test[0])
+coef_img = masker.inverse_transform(betas_test[0] - betas_test[3])
 coef_map = coef_img.get_data()
-# threshold = np.max(np.abs(coef_map)) * 0.05
+threshold = np.max(np.abs(coef_map)) * 0.05
 plot_stat_map(coef_img, bg_img=haxby_dataset.anat[0],
-              display_mode='z', cut_coords=1,
-              title=model+" weights")
+              display_mode='z', cut_coords=[-5],
+              title=model+" weights", threshold=threshold)
 
 show()

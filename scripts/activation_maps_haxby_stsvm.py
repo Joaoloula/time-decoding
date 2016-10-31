@@ -1,6 +1,6 @@
 from time_decoding.data_reading import read_data_haxby
 from nilearn.plotting import plot_stat_map, show
-from sklearn.svm import LinearSVC
+from sklearn.svm import SVC
 from nilearn import datasets
 import time_decoding.decoding as de
 import numpy as np
@@ -40,15 +40,15 @@ fmri_windows_train, fmri_windows_test, anova = de.feature_selection(
     selector=True)
 """
 
-svc = LinearSVC()
+svc = SVC(kernel='linear')
 svc.fit(fmri_windows_train, conditions_train)
-svc_coef = svc.coef_[4]  # 'house'
+svc_coef = -svc.coef_[18]  # 'face' vs. 'house'
 # svc_coef = anova.inverse_transform(svc_coef)
 coef_img = masker.inverse_transform(svc_coef.reshape(10, -1)[1])
 coef_map = coef_img.get_data()
-# threshold = np.max(np.abs(coef_map)) * 0.05
+threshold = np.max(np.abs(coef_map)) * 0.05
 plot_stat_map(coef_img, bg_img=haxby_dataset.anat[0],
-              display_mode='z',cut_coords=1,
+              display_mode='z',cut_coords=[-5],
               title=model+" weights")
 
 show()

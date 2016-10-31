@@ -44,14 +44,14 @@ stimuli_train, stimuli_test = (stimuli[train_index],
 ridge = RidgeCV()
 ridge.fit(fmri_train, stimuli_train)
 prediction = ridge.predict(fmri_test)
-ridge_coef = ridge.coef_[2]  # 'house'
+ridge_coef = - ridge.coef_[1] + ridge.coef_[2]  # 'face' vs. 'house'
 coef_img = masker.inverse_transform(ridge_coef)
 coef_map = coef_img.get_data()
 threshold = np.max(np.abs(coef_map)) * 0.05
 
 # Plot stat map
 plot_stat_map(coef_img, bg_img=haxby_dataset.anat[0],
-              display_mode='z', cut_coords=1,
+              display_mode='z', cut_coords=[-5],
               title=model+" weights", threshold=threshold)
 """
 # Plot time-series

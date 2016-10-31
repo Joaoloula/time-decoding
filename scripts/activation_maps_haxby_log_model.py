@@ -54,7 +54,7 @@ prediction = ridge.predict(fmri_test)
 ridge_coef = - ridge.coef_[1] + ridge.coef_[2]  # 'face' vs. 'house'
 coef_img = masker.inverse_transform(ridge_coef)
 coef_map = coef_img.get_data()
-threshold = np.percentile(np.abs(coef_map), 98)
+threshold = np.percentile(np.abs(coef_map), 99)
 
 # Plot stat map
 plot_stat_map(coef_img, bg_img=haxby_dataset.anat[0],

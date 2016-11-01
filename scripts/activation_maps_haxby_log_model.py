@@ -27,7 +27,8 @@ design = [de.design_matrix(len(fmri[session]), tr, onsets[session],
                            conditions[session], hrf_model=hrf_model,
                            durations=durations[session])
           for session in range(len(fmri))]
-
+fmri, stimuli, session_id_fmri = (fmri, stimuli,
+                                  np.array(session_id_fmri))
 # Stack the BOLD signals and the design matrices
 fmri = np.vstack(fmri)
 design = np.vstack(design)
@@ -52,15 +53,14 @@ ridge = RidgeCV()
 ridge.fit(fmri_train, design_train)
 prediction = ridge.predict(fmri_test)
 ridge_coef = - ridge.coef_[3] + ridge.coef_[4]  # 'face' vs. 'house'
-# ridge_coef = - ridge.coef_[0] + ridge.coef_[1]  # 'face' vs. 'house'
 coef_img = masker.inverse_transform(ridge_coef)
 coef_map = coef_img.get_data()
 threshold = np.percentile(np.abs(coef_map), 98)
 
 # Plot stat map
 plot_stat_map(coef_img, bg_img=haxby_dataset.anat[0],
-              display_mode='z', cut_coords=[-5],
-              title=model+" weights", threshold=threshold)
+              display_mode='z', cut_coords=[-1],
+              title=model+" weights")
 """
 # Plot time-series
 onset = int(onsets[6][3]/tr)

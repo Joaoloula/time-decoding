@@ -52,7 +52,8 @@ stimuli_train, stimuli_test = stimuli[train_index], stimuli[test_index]
 ridge = RidgeCV()
 ridge.fit(fmri_train, design_train)
 prediction = ridge.predict(fmri_test)
-ridge_coef = - ridge.coef_[3] + ridge.coef_[4]  # 'face' vs. 'house'
+# ridge_coef = ridge.coef_[4]  # 'face' vs. 'house'
+ridge_coef = -ridge.coef_[3] + ridge.coef_[4]  # 'face' vs. 'house'
 coef_img = masker.inverse_transform(ridge_coef)
 coef_map = coef_img.get_data()
 threshold = np.percentile(np.abs(coef_map), 98)

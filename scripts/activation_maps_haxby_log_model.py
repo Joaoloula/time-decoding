@@ -59,7 +59,7 @@ threshold = np.percentile(np.abs(coef_map), 98)
 
 # Plot stat map
 plot_stat_map(coef_img, bg_img=haxby_dataset.anat[0],
-              display_mode='z', cut_coords=[-1],
+              display_mode='z', cut_coords=[-5],
               title=model+" weights")
 """
 # Plot time-series
